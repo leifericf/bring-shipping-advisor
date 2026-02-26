@@ -11,9 +11,11 @@ This project fetches shipping rates and invoice data from the Bring API to help 
 ```
 bring-shipping-rates/
 ├── README.md           # This file
+├── package.json        # Project metadata and npm scripts
 ├── .env.example        # Environment template (copy to .env)
 ├── .env                # Your credentials (git-ignored)
 ├── src/
+│   ├── lib.mjs             # Shared utilities (env, CSV, fetch helpers)
 │   ├── run.mjs             # Entry point - runs all scripts
 │   ├── fetch_rates.mjs     # Fetch shipping rates from Bring API
 │   ├── fetch_invoices.mjs  # Fetch invoice data and PDFs from Bring API
@@ -55,6 +57,8 @@ Each script run creates a new timestamped folder in `data/`, so historical data 
    BRING_API_UID=your-email@example.com
    BRING_API_KEY=your-api-key-here
    BRING_CUSTOMER_NUMBER=your-customer-number-here
+   # Postal code where packages are shipped from (default: 0174)
+   BRING_ORIGIN_POSTAL_CODE=0562
    ```
 
 **Important**: Never commit `.env` to git.
@@ -63,7 +67,13 @@ Each script run creates a new timestamped folder in `data/`, so historical data 
 
 ### Quick Start
 
-Run the full pipeline with a single command:
+Run the full pipeline:
+
+```bash
+npm start
+```
+
+Or directly:
 
 ```bash
 node src/run.mjs
@@ -76,9 +86,9 @@ This runs all scripts in order: fetch rates → fetch invoices → analyze data.
 You can also run scripts individually:
 
 ```bash
-node src/fetch_rates.mjs      # Fetch shipping rates
-node src/fetch_invoices.mjs   # Fetch invoices and PDFs
-node src/analyze.mjs          # Generate recommendations
+npm run fetch:rates       # Fetch shipping rates
+npm run fetch:invoices    # Fetch invoices and PDFs
+npm run analyze           # Generate recommendations
 ```
 
 ### Script Details
@@ -88,11 +98,11 @@ node src/analyze.mjs          # Generate recommendations
 Fetches shipping rates for:
 - **Norway**: 7 zones across the country, 5 domestic services
 - **International**: Sweden, Denmark, Finland, Iceland, Greenland, Faroe Islands
-- **Weight tiers**: 250g, 750g, 1kg, 5kg, 10kg, 20kg, 35kg
+- **Weight tiers**: 250g, 750g, 1kg, 5kg, 10kg, 20kg, 35kg (filtered per service max weight)
 
 Output: `data/<timestamp>_<customer>/shipping_rates.csv`
 
-### fetch_invoices.mjs
+#### fetch_invoices.mjs
 
 Fetches:
 - List of all invoices from your account
@@ -103,12 +113,13 @@ Output:
 - `data/<timestamp>_<customer>/invoice_line_items.csv`
 - `data/<timestamp>_<customer>/invoices/*.pdf`
 
-### analyze.mjs
+#### analyze.mjs
 
 Analyzes the fetched data and generates:
-- Recommended shipping rates per country/weight tier
+- Recommended shipping rates per country/weight tier (with VAT for Norway)
 - Summary of your actual shipping costs from invoices
-- Norway zone pricing breakdown
+- Norway zone pricing breakdown across all weight tiers
+- Road toll average derived from invoice data
 
 Output: `data/<timestamp>_<customer>/RESULTS.md`
 
@@ -127,6 +138,8 @@ Output: `data/<timestamp>_<customer>/RESULTS.md`
 ## Norway Zone System
 
 Norway has 7 shipping zones based on distance from the origin postal code. The scripts sample postal codes from each zone to show the full price range.
+
+Note: Zone numbers can differ per service for the same postal code (e.g., service 5600 uses different zones than 3584).
 
 ## VAT Notes
 
