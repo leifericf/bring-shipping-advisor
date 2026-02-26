@@ -1,40 +1,13 @@
 import fs from 'fs';
-import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const ROOT_DIR = join(__dirname, '..');
-const DATA_DIR = join(ROOT_DIR, 'data');
-
-function loadEnv() {
-  const envPath = join(ROOT_DIR, '.env');
-  if (!fs.existsSync(envPath)) {
-    console.error('Error: .env file not found. Copy .env.example to .env and fill in your credentials.');
-    process.exit(1);
-  }
-  const envContent = fs.readFileSync(envPath, 'utf8');
-  const env = {};
-  for (const line of envContent.split('\n')) {
-    const [key, ...valueParts] = line.split('=');
-    if (key && valueParts.length > 0) {
-      env[key.trim()] = valueParts.join('=').trim();
-    }
-  }
-  return env;
-}
-
-function getOutputDir(customerNumber) {
-  const now = new Date();
-  const dateStr = now.toISOString().substring(0, 10);
-  return join(DATA_DIR, `${dateStr}_${customerNumber}`);
-}
+import { join } from 'path';
+import { loadEnv, getOutputDir, getAuthHeaders, sleep, fetchWithRetry, csvRow } from './lib.mjs';
 
 const env = loadEnv();
 
 const API_UID = env.BRING_API_UID;
 const API_KEY = env.BRING_API_KEY;
 const CUSTOMER_NUMBER = env.BRING_CUSTOMER_NUMBER;
-const ORIGIN_POSTAL_CODE = '0174';
+const ORIGIN_POSTAL_CODE = env.BRING_ORIGIN_POSTAL_CODE || '0174';
 const ORIGIN_COUNTRY = 'NO';
 const OUTPUT_DIR = getOutputDir(CUSTOMER_NUMBER);
 
@@ -55,26 +28,22 @@ const DESTINATIONS = [
 ];
 
 const DOMESTIC_SERVICES = [
-  { id: '3584', name: 'Home mailbox parcel' },
-  { id: '3570', name: 'Home mailbox parcel RFID' },
-  { id: '5800', name: 'Pickup parcel' },
-  { id: '5000', name: 'Business parcel' },
-  { id: '5600', name: 'Parcel home plus' },
+  { id: '3584', name: 'Home mailbox parcel', maxWeight: 5000 },
+  { id: '3570', name: 'Home mailbox parcel RFID', maxWeight: 5000 },
+  { id: '5800', name: 'Pickup parcel', maxWeight: 35000 },
+  { id: '5000', name: 'Business parcel', maxWeight: 35000 },
+  { id: '5600', name: 'Parcel home plus', maxWeight: 35000 },
 ];
 
 const INTERNATIONAL_SERVICES = [
-  { id: 'PICKUP_PARCEL', name: 'PickUp Parcel' },
-  { id: 'BUSINESS_PARCEL', name: 'Business Parcel' },
-  { id: 'HOME_DELIVERY_PARCEL', name: 'Home Delivery Parcel' },
-  { id: '3639', name: 'Letter parcel International' },
+  { id: 'PICKUP_PARCEL', name: 'PickUp Parcel', maxWeight: 20000 },
+  { id: 'BUSINESS_PARCEL', name: 'Business Parcel', maxWeight: 35000 },
+  { id: 'HOME_DELIVERY_PARCEL', name: 'Home Delivery Parcel', maxWeight: 35000 },
+  { id: '3639', name: 'Letter parcel International', maxWeight: 2000 },
 ];
 
 const WEIGHTS_GRAMS = [250, 750, 1000, 5000, 10000, 20000, 35000];
 const API_URL = 'https://api.bring.com/shippingguide/api/v2/products';
-
-function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
 
 async function fetchRates(destination, service, weightGrams) {
   const today = new Date();
@@ -100,13 +69,12 @@ async function fetchRates(destination, service, weightGrams) {
     withGuiInformation: true,
   };
 
-  const response = await fetch(API_URL, {
+  const response = await fetchWithRetry(API_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
-      'X-Mybring-API-Uid': API_UID,
-      'X-Mybring-API-Key': API_KEY,
+      ...getAuthHeaders(env),
     },
     body: JSON.stringify(body),
   });
@@ -135,7 +103,7 @@ async function fetchRates(destination, service, weightGrams) {
 
 async function main() {
   fs.mkdirSync(OUTPUT_DIR, { recursive: true });
-  
+
   console.log('Fetching Bring shipping rates...\n');
   console.log(`Origin: ${ORIGIN_POSTAL_CODE}, ${ORIGIN_COUNTRY}`);
   console.log(`Customer Number: ${CUSTOMER_NUMBER}`);
@@ -143,13 +111,16 @@ async function main() {
   console.log(`Weight tiers: ${WEIGHTS_GRAMS.map(w => `${w}g`).join(', ')}\n`);
 
   const results = [];
+
+  // Count total requests, skipping weights above service max
   let totalRequests = 0;
-  
   for (const dest of DESTINATIONS) {
     const services = dest.code === 'NO' ? DOMESTIC_SERVICES : INTERNATIONAL_SERVICES;
-    totalRequests += services.length * WEIGHTS_GRAMS.length;
+    for (const service of services) {
+      totalRequests += WEIGHTS_GRAMS.filter(w => w <= service.maxWeight).length;
+    }
   }
-  
+
   let completedRequests = 0;
 
   for (const destination of DESTINATIONS) {
@@ -157,7 +128,9 @@ async function main() {
     console.log(`\nFetching rates for ${destination.country} - ${destination.desc} (Zone ${destination.zone})...`);
 
     for (const service of services) {
-      for (const weight of WEIGHTS_GRAMS) {
+      const applicableWeights = WEIGHTS_GRAMS.filter(w => w <= service.maxWeight);
+
+      for (const weight of applicableWeights) {
         completedRequests++;
         process.stdout.write(`  [${completedRequests}/${totalRequests}] ${service.name} @ ${weight}g... `);
 
@@ -188,11 +161,14 @@ async function main() {
     }
   }
 
+  // Write shipping_rates.csv
   const csvHeader = 'country,country_code,postal_code,zone,service_id,service_name,weight_g,price_nok';
-  const csvRows = results.map(r => `${r.country},${r.country_code},${r.postal_code},${r.zone},${r.service_id || ''},${r.service_name || ''},${r.weight_g},${r.price_nok}`);
+  const csvRows = results.map(r =>
+    csvRow([r.country, r.country_code, r.postal_code, r.zone, r.service_id, r.service_name, r.weight_g, r.price_nok])
+  );
   fs.writeFileSync(join(OUTPUT_DIR, 'shipping_rates.csv'), [csvHeader, ...csvRows].join('\n'));
 
-  // Generate zones.csv with unique postal codes and their zones
+  // Generate zones.csv — note: zones can differ per service for the same postal code
   const zonesMap = new Map();
   for (const r of results) {
     const key = `${r.country_code}_${r.postal_code}`;
@@ -208,7 +184,7 @@ async function main() {
   const zonesHeader = 'country,country_code,postal_code,zone';
   const zonesRows = [...zonesMap.values()]
     .sort((a, b) => a.country.localeCompare(b.country) || a.postal_code.localeCompare(b.postal_code))
-    .map(z => `${z.country},${z.country_code},${z.postal_code},${z.zone}`);
+    .map(z => csvRow([z.country, z.country_code, z.postal_code, z.zone]));
   fs.writeFileSync(join(OUTPUT_DIR, 'zones.csv'), [zonesHeader, ...zonesRows].join('\n'));
 
   console.log(`\n\nDone! Fetched ${results.length} rates.`);
