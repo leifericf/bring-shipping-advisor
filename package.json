@@ -1,0 +1,15 @@
+{
+  "name": "bring-shipping-rates",
+  "version": "1.0.0",
+  "description": "Fetch and analyze shipping rates from Bring (Posten) for Shopify stores",
+  "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node src/run.mjs",
+    "fetch:rates": "node src/fetch_rates.mjs",
+    "fetch:invoices": "node src/fetch_invoices.mjs",
+    "analyze": "node src/analyze.mjs"
+  }
+}
