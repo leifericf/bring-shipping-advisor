@@ -1,0 +1,67 @@
+{
+  "originCountry": "NO",
+
+  "destinations": [
+    { "country": "Norway", "code": "NO", "postalCode": "0150", "zone": 1, "desc": "Oslo" },
+    { "country": "Norway", "code": "NO", "postalCode": "1613", "zone": 2, "desc": "Østlandet" },
+    { "country": "Norway", "code": "NO", "postalCode": "5015", "zone": 3, "desc": "Bergen" },
+    { "country": "Norway", "code": "NO", "postalCode": "7020", "zone": 4, "desc": "Trondheim" },
+    { "country": "Norway", "code": "NO", "postalCode": "9405", "zone": 5, "desc": "Harstad" },
+    { "country": "Norway", "code": "NO", "postalCode": "8100", "zone": 6, "desc": "Bodø" },
+    { "country": "Norway", "code": "NO", "postalCode": "9700", "zone": 7, "desc": "Vadsø" },
+    { "country": "Sweden", "code": "SE", "postalCode": "11122", "zone": 1, "desc": "Stockholm" },
+    { "country": "Denmark", "code": "DK", "postalCode": "1050", "zone": 1, "desc": "Copenhagen" },
+    { "country": "Finland", "code": "FI", "postalCode": "00100", "zone": 1, "desc": "Helsinki" },
+    { "country": "Iceland", "code": "IS", "postalCode": "101", "zone": 6, "desc": "Reykjavik" },
+    { "country": "Greenland", "code": "GL", "postalCode": "3900", "zone": 7, "desc": "Nuuk" },
+    { "country": "Faroe Islands", "code": "FO", "postalCode": "100", "zone": 7, "desc": "Tórshavn" },
+    { "country": "Japan", "code": "JP", "postalCode": "1000001", "zone": null, "desc": "Tokyo" }
+  ],
+
+  "weightTiersGrams": [250, 750, 1000, 5000, 10000, 20000, 35000],
+
+  "domesticServices": [
+    { "id": "3584", "name": "Home mailbox parcel", "maxWeight": 5000 },
+    { "id": "3570", "name": "Home mailbox parcel RFID", "maxWeight": 5000 },
+    { "id": "5800", "name": "Pickup parcel", "maxWeight": 35000 },
+    { "id": "5000", "name": "Business parcel", "maxWeight": 35000 },
+    { "id": "5600", "name": "Parcel home plus", "maxWeight": 35000 }
+  ],
+
+  "internationalServices": [
+    { "id": "PICKUP_PARCEL", "name": "PickUp Parcel", "maxWeight": 20000 },
+    { "id": "BUSINESS_PARCEL", "name": "Business Parcel", "maxWeight": 35000 },
+    { "id": "HOME_DELIVERY_PARCEL", "name": "Home Delivery Parcel", "maxWeight": 35000 },
+    { "id": "3639", "name": "Letter parcel International", "maxWeight": 2000 }
+  ],
+
+  "analysis": {
+    "vatMultiplier": 1.25,
+    "safeDefaultZone": "3",
+    "primaryDomesticService": "3584",
+    "cheapestInternationalService": "PICKUP_PARCEL",
+    "domesticZoneCount": 7,
+    "countryGroupings": {
+      "nordic": ["SE", "DK", "FI"],
+      "remote": ["IS", "GL", "FO", "JP"]
+    },
+    "domesticWeightTiers": [
+      { "name": "0-250g", "key": "250" },
+      { "name": "250-750g", "key": "750" },
+      { "name": "750g-1kg", "key": "1000" },
+      { "name": "1-5kg", "key": "5000" }
+    ],
+    "domesticShopifyBrackets": [
+      { "name": "0\u20130.5 kg", "maxWeight": 0.5, "rateWeight": "250" },
+      { "name": "0.5\u20131 kg", "maxWeight": 1.0, "rateWeight": "1000" },
+      { "name": "1 kg+", "maxWeight": null, "rateWeight": "5000" }
+    ],
+    "internationalWeightColumns": ["250", "750", "1000", "5000", "10000", "20000"],
+    "internationalShopifyBrackets": [
+      { "name": "0\u20131 kg", "weight": "250" },
+      { "name": "1 kg+", "weight": "5000" }
+    ],
+    "zonePricingColumns": ["250", "750", "1000", "5000"],
+    "zonesForShopifyTable": ["1", "3", "7"]
+  }
+}
