@@ -190,8 +190,87 @@ Generated: ${new Date().toISOString()}
     md += `| ${zone} | ${cells.join(' | ')} |\n`;
   }
 
-  md += `
-## Notes
+  // Suggested Shopify rates — simplified tiers
+  const shopifyBrackets = [
+    { name: '0–0.5 kg', weight: '250' },
+    { name: '0.5–1 kg', weight: '1000' },
+    { name: '1 kg+', weight: '5000' },
+  ];
+
+  md += `\n## Suggested Shopify Rates
+
+### Norway — Service 3584 (incl. road toll + 25% VAT, rounded up)
+
+| Weight | Zone 1 (Oslo) | Zone 3 (Bergen) | Zone 7 (Finnmark) |
+|--------|--------------|-----------------|-------------------|
+`;
+
+  for (const bracket of shopifyBrackets) {
+    const cells = ['1', '3', '7'].map(zone => {
+      const rate = norway3584.find(r => r.zone === zone && r.weight_g === bracket.weight);
+      if (!rate) return 'N/A';
+      return `${Math.ceil((parseFloat(rate.price_nok) + roadToll) * 1.25)} NOK`;
+    });
+    md += `| ${bracket.name} | ${cells.join(' | ')} |\n`;
+  }
+
+  md += `\n### International — PICKUP_PARCEL (no VAT, rounded up)
+
+| Country | 0–0.5 kg | 0.5–1 kg | 1 kg+ |
+|---------|----------|----------|-------|
+`;
+
+  const intlBracketWeights = ['250', '1000', '5000'];
+
+  for (const [code, name] of Object.entries(countryNames)) {
+    const cells = intlBracketWeights.map(w => {
+      const rate = rates.find(r =>
+        r.country_code === code &&
+        r.service_id === 'PICKUP_PARCEL' &&
+        r.weight_g === w
+      );
+      return rate ? `${Math.ceil(parseFloat(rate.price_nok))} NOK` : 'N/A';
+    });
+    md += `| ${name} | ${cells.join(' | ')} |\n`;
+  }
+
+  // Simplified recommendation
+  // Group Nordics (SE/DK/FI) and remote (IS/GL/FO) — use the highest price in each group
+  const nordicMax = {};
+  const remoteMax = {};
+  for (const w of intlBracketWeights) {
+    const nordicPrices = ['SE', 'DK', 'FI'].map(code => {
+      const r = rates.find(r => r.country_code === code && r.service_id === 'PICKUP_PARCEL' && r.weight_g === w);
+      return r ? Math.ceil(parseFloat(r.price_nok)) : 0;
+    });
+    nordicMax[w] = Math.max(...nordicPrices);
+
+    const remotePrices = ['IS', 'GL', 'FO'].map(code => {
+      const r = rates.find(r => r.country_code === code && r.service_id === 'PICKUP_PARCEL' && r.weight_g === w);
+      return r ? Math.ceil(parseFloat(r.price_nok)) : 0;
+    });
+    remoteMax[w] = Math.max(...remotePrices);
+  }
+
+  // Norway Zone 3 as safe default
+  const norwaySimple = shopifyBrackets.map(b => {
+    const rate = norway3584.find(r => r.zone === '3' && r.weight_g === b.weight);
+    return rate ? `${Math.ceil((parseFloat(rate.price_nok) + roadToll) * 1.25)} NOK` : 'N/A';
+  });
+
+  md += `\n### Simplified recommendation
+
+| Destination | 0–0.5 kg | 0.5–1 kg | 1 kg+ |
+|-------------|----------|----------|-------|
+| Norway | ${norwaySimple.join(' | ')} |
+| Sweden / Denmark / Finland | ${intlBracketWeights.map(w => `${nordicMax[w]} NOK`).join(' | ')} |
+| Iceland / Greenland / Faroes | ${intlBracketWeights.map(w => `${remoteMax[w]} NOK`).join(' | ')} |
+
+Norway uses Zone 3 pricing (covers most of the country). Nordic and remote groups use the highest price in each group so you never lose money.
+
+`;
+
+  md += `## Notes
 
 - **Zone risk**: Zone 1 prices are cheapest. Shipping to Zone 7 (Finnmark) costs roughly 2x Zone 1.
 - **Weight limits**: 3584 max 5kg, PickUp Parcel max 20kg
