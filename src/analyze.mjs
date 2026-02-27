@@ -1,32 +1,20 @@
-import fs from 'fs';
-import { join } from 'path';
-import { DATA_DIR, parseCsv } from './lib.mjs';
 import { loadConfig } from './config.mjs';
 import { getDb, getShippingRates, getInvoiceLineItems, insertAnalysisResult, closeDb } from './db.mjs';
 
+const RUN_ID = Number(process.env.RUN_ID);
+if (!RUN_ID) {
+  console.error('Error: RUN_ID environment variable is required. Use "npm start" or the web UI.');
+  process.exit(1);
+}
+
 const config = loadConfig();
 const analysis = config.analysis;
-const RUN_ID = process.env.RUN_ID ? Number(process.env.RUN_ID) : null;
 
 /**
  * Round up to the next "nice" price ending in 9 (e.g. 59, 79, 149, 999).
  */
 function nicePrice(value) {
   return Math.ceil((value - 9) / 10) * 10 + 9;
-}
-
-function findLatestDataDir() {
-  const dirs = fs.readdirSync(DATA_DIR)
-    .filter(name => fs.statSync(join(DATA_DIR, name)).isDirectory())
-    .sort()
-    .reverse();
-
-  if (dirs.length === 0) {
-    console.error('No data directories found. Run fetch_rates.mjs and fetch_invoices.mjs first.');
-    process.exit(1);
-  }
-
-  return join(DATA_DIR, dirs[0]);
 }
 
 /**
@@ -102,7 +90,7 @@ function buildShipmentProfiles(lineItems) {
 }
 
 /**
- * Generate a profitability analysis section for RESULTS.md.
+ * Generate a profitability analysis section for the report.
  * Cross-references actual invoice costs against suggested Shopify rates.
  */
 function generateProfitabilitySection(lineItems, rates, roadToll) {
@@ -241,7 +229,7 @@ function generateProfitabilitySection(lineItems, rates, roadToll) {
 }
 
 /**
- * Generate the RESULTS.md markdown report.
+ * Generate the analysis report as markdown.
  */
 function generateResultsMd(rates, invoiceAnalysis, lineItems) {
   const { byProduct, avgRoadToll } = invoiceAnalysis;
@@ -482,65 +470,41 @@ International only needs two Shopify weight brackets (${intlShopifyBrackets.map(
 }
 
 async function main() {
-  const outputDir = process.env.OUTPUT_DIR || findLatestDataDir();
-  console.log(`Analyzing data from: ${outputDir}\n`);
+  // Ensure DB is initialized
+  getDb();
 
-  let rates, lineItems;
+  console.log(`Analyzing data from run ${RUN_ID}...\n`);
 
-  // Prefer reading from database when we have a run ID
-  if (RUN_ID) {
-    console.log(`Reading data from database (run ${RUN_ID})...`);
-    rates = getShippingRates(RUN_ID).map(r => ({
-      ...r,
-      // Normalize zone: DB may store as "1.0" (float text), CSV uses "1"
-      zone: r.zone != null ? String(r.zone).replace(/\.0$/, '') : '',
-      weight_g: String(r.weight_g),
-      price_nok: String(r.price_nok),
-    }));
-    lineItems = getInvoiceLineItems(RUN_ID).map(r => ({
-      ...r,
-      weight_kg: r.weight_kg != null ? String(r.weight_kg) : '',
-      agreement_price: String(r.agreement_price ?? 0),
-      gross_price: String(r.gross_price ?? 0),
-      discount: String(r.discount ?? 0),
-    }));
-    console.log(`Loaded ${rates.length} shipping rates from DB`);
-    console.log(`Loaded ${lineItems.length} invoice line items from DB\n`);
-  } else {
-    // Fall back to CSV files
-    const ratesPath = join(outputDir, 'shipping_rates.csv');
-    const invoicesPath = join(outputDir, 'invoice_line_items.csv');
+  const rates = getShippingRates(RUN_ID).map(r => ({
+    ...r,
+    // Normalize zone: DB may store as "1.0" (float text), need "1"
+    zone: r.zone != null ? String(r.zone).replace(/\.0$/, '') : '',
+    weight_g: String(r.weight_g),
+    price_nok: String(r.price_nok),
+  }));
+  const lineItems = getInvoiceLineItems(RUN_ID).map(r => ({
+    ...r,
+    weight_kg: r.weight_kg != null ? String(r.weight_kg) : '',
+    agreement_price: String(r.agreement_price ?? 0),
+    gross_price: String(r.gross_price ?? 0),
+    discount: String(r.discount ?? 0),
+  }));
 
-    if (!fs.existsSync(ratesPath)) {
-      console.error('shipping_rates.csv not found. Run fetch_rates.mjs first.');
-      process.exit(1);
-    }
-
-    if (!fs.existsSync(invoicesPath)) {
-      console.error('invoice_line_items.csv not found. Run fetch_invoices.mjs first.');
-      process.exit(1);
-    }
-
-    rates = parseCsv(fs.readFileSync(ratesPath, 'utf8'));
-    lineItems = parseCsv(fs.readFileSync(invoicesPath, 'utf8'));
-    console.log(`Loaded ${rates.length} shipping rates`);
-    console.log(`Loaded ${lineItems.length} invoice line items\n`);
-  }
+  console.log(`Loaded ${rates.length} shipping rates from DB`);
+  console.log(`Loaded ${lineItems.length} invoice line items from DB\n`);
 
   // Analyze
   const invoiceAnalysis = analyzeInvoices(lineItems);
 
-  // Generate RESULTS.md
+  // Generate report
   const resultsMd = generateResultsMd(rates, invoiceAnalysis, lineItems);
-  fs.writeFileSync(join(outputDir, 'RESULTS.md'), resultsMd);
 
-  // Save to database if we have a run ID
-  if (RUN_ID) {
-    insertAnalysisResult(RUN_ID, resultsMd);
-    closeDb();
-  }
+  // Save to database
+  insertAnalysisResult(RUN_ID, resultsMd);
+  closeDb();
 
-  console.log(`Generated ${outputDir}/RESULTS.md`);
+  // Print to stdout for CLI users
+  console.log(resultsMd);
 }
 
 main().catch(console.error);

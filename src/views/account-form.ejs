@@ -3,7 +3,7 @@
 <form method="POST" action="<%= editing ? '/accounts/' + account.id : '/accounts' %>">
   <label>
     Account Name
-    <input type="text" name="name" value="<%= account.name || '' %>" placeholder="e.g. Hibi Kaffe" required>
+    <input type="text" name="name" value="<%= account.name || '' %>" placeholder="e.g. My Store" required>
   </label>
 
   <fieldset>
@@ -22,12 +22,12 @@
     <div class="grid">
       <label>
         Customer Number
-        <input type="text" name="customer_number" value="<%= account.customer_number || '' %>" placeholder="e.g. 20022286171" required>
+        <input type="text" name="customer_number" value="<%= account.customer_number || '' %>" placeholder="e.g. XXXXXXXXXXXXX" required>
       </label>
 
       <label>
         Origin Postal Code
-        <input type="text" name="origin_postal_code" value="<%= account.origin_postal_code || '0174' %>" placeholder="e.g. 0562" required>
+        <input type="text" name="origin_postal_code" value="<%= account.origin_postal_code || '0174' %>" placeholder="e.g. 0001" required>
       </label>
     </div>
   </fieldset>

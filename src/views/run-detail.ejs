@@ -56,8 +56,8 @@
   <% if (run.account_id) { %>
     <a href="/accounts/<%= run.account_id %>/runs" role="button" class="outline secondary">Back to Runs</a>
   <% } %>
-  <a href="/" role="button" class="outline secondary">Dashboard</a>
-  <% if (run.output_dir) { %>
-    <small class="push-right run-output-path">Output: <code><%= run.output_dir %></code></small>
+  <% if (invoiceCount > 0) { %>
+    <a href="/runs/<%= run.id %>/invoices" role="button" class="outline secondary">Invoices (<%= invoiceCount %>)</a>
   <% } %>
+  <a href="/" role="button" class="outline secondary">Dashboard</a>
 </div>

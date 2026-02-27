@@ -34,6 +34,7 @@ export function closeDb() {
 
 /**
  * Create tables if they don't exist.
+ * Includes migrations for existing databases from earlier versions.
  */
 function initSchema() {
   // Migrate: add account_id column to runs if it doesn't exist (for existing DBs)
@@ -87,6 +88,16 @@ function initSchema() {
       zone         TEXT
     );
 
+    CREATE TABLE IF NOT EXISTS invoices (
+      id                       INTEGER PRIMARY KEY AUTOINCREMENT,
+      run_id                   INTEGER NOT NULL REFERENCES runs(id),
+      invoice_number           TEXT NOT NULL,
+      invoice_date             TEXT,
+      total_amount             REAL,
+      currency                 TEXT,
+      specification_available  INTEGER NOT NULL DEFAULT 0
+    );
+
     CREATE TABLE IF NOT EXISTS invoice_line_items (
       id               INTEGER PRIMARY KEY AUTOINCREMENT,
       run_id           INTEGER NOT NULL REFERENCES runs(id),
@@ -117,6 +128,7 @@ function initSchema() {
 
     CREATE INDEX IF NOT EXISTS idx_shipping_rates_run ON shipping_rates(run_id);
     CREATE INDEX IF NOT EXISTS idx_zones_run ON zones(run_id);
+    CREATE INDEX IF NOT EXISTS idx_invoices_run ON invoices(run_id);
     CREATE INDEX IF NOT EXISTS idx_invoice_line_items_run ON invoice_line_items(run_id);
     CREATE INDEX IF NOT EXISTS idx_analysis_results_run ON analysis_results(run_id);
     CREATE INDEX IF NOT EXISTS idx_runs_account ON runs(account_id);
@@ -169,13 +181,13 @@ export function deleteAccount(id) {
 // Run helpers
 // ---------------------------------------------------------------------------
 
-export function createRun(customerNumber, originPostalCode, outputDir, configSnapshot, accountId = null) {
+export function createRun(customerNumber, originPostalCode, configSnapshot, accountId = null) {
   const db = getDb();
   const stmt = db.prepare(`
-    INSERT INTO runs (account_id, customer_number, origin_postal_code, output_dir, config_snapshot, status)
-    VALUES (?, ?, ?, ?, ?, 'pending')
+    INSERT INTO runs (account_id, customer_number, origin_postal_code, config_snapshot, status)
+    VALUES (?, ?, ?, ?, 'pending')
   `);
-  const result = stmt.run(accountId, customerNumber, originPostalCode, outputDir, JSON.stringify(configSnapshot));
+  const result = stmt.run(accountId, customerNumber, originPostalCode, JSON.stringify(configSnapshot));
   return result.lastInsertRowid;
 }
 
@@ -241,6 +253,25 @@ export function insertZones(runId, zones) {
 // Invoice helpers
 // ---------------------------------------------------------------------------
 
+export function insertInvoices(runId, invoices) {
+  const db = getDb();
+  const stmt = db.prepare(`
+    INSERT INTO invoices (run_id, invoice_number, invoice_date, total_amount, currency, specification_available)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `);
+  const insertMany = db.transaction((rows) => {
+    for (const inv of rows) {
+      stmt.run(runId, inv.invoiceNumber, inv.invoiceDate, inv.totalAmount, inv.currency, inv.specificationAvailable ? 1 : 0);
+    }
+  });
+  insertMany(invoices);
+}
+
+export function getInvoices(runId) {
+  const db = getDb();
+  return db.prepare('SELECT * FROM invoices WHERE run_id = ? ORDER BY invoice_date DESC').all(runId);
+}
+
 export function insertInvoiceLineItems(runId, lineItems) {
   const db = getDb();
   const stmt = db.prepare(`
@@ -275,7 +306,7 @@ export function getAnalysisResult(runId) {
 }
 
 /**
- * Get shipping rates for a run, as plain objects matching the CSV column names.
+ * Get shipping rates for a run.
  */
 export function getShippingRates(runId) {
   const db = getDb();
@@ -283,7 +314,7 @@ export function getShippingRates(runId) {
 }
 
 /**
- * Get invoice line items for a run, as plain objects matching the CSV column names.
+ * Get invoice line items for a run.
  */
 export function getInvoiceLineItems(runId) {
   const db = getDb();

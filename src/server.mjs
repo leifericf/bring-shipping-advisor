@@ -6,12 +6,13 @@ import { spawn } from 'child_process';
 import { tmpdir } from 'os';
 import { marked } from 'marked';
 
-import { DATA_DIR } from './lib.mjs';
+import { httpsGet } from './lib.mjs';
 import { DEFAULT_CONFIG_PATH } from './config.mjs';
 import {
   getDb, closeDb,
   getAllAccounts, getAccount, createAccount, updateAccount, updateAccountConfig, deleteAccount,
   createRun as dbCreateRun, getRun, getRunsForAccount, getRecentRuns, getAnalysisResult,
+  getInvoices,
 } from './db.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -137,12 +138,8 @@ app.post('/accounts/:id/runs', (req, res) => {
 
   const config = JSON.parse(account.config);
 
-  // Compute output directory
-  const dateStr = new Date().toISOString().substring(0, 10);
-  const outputDir = join(DATA_DIR, `${dateStr}_${account.customer_number}`);
-
   // Create run record
-  const runId = dbCreateRun(account.customer_number, account.origin_postal_code, outputDir, config, account.id);
+  const runId = dbCreateRun(account.customer_number, account.origin_postal_code, config, account.id);
 
   // Write temp config file for this run
   const configPath = join(tmpdir(), `bring-config-${runId}.json`);
@@ -157,7 +154,6 @@ app.post('/accounts/:id/runs', (req, res) => {
       BRING_CUSTOMER_NUMBER: account.customer_number,
       BRING_ORIGIN_POSTAL_CODE: account.origin_postal_code,
       CONFIG_PATH: configPath,
-      OUTPUT_DIR: outputDir,
       RUN_ID: String(runId),
     },
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -198,13 +194,67 @@ app.get('/runs/:id', (req, res) => {
     }
   }
 
-  render(res, 'run-detail', { title: 'Run #' + run.id, run, resultsHtml });
+  // Check if this run has invoices
+  const invoices = run.status === 'completed' ? getInvoices(run.id) : [];
+
+  render(res, 'run-detail', { title: 'Run #' + run.id, run, resultsHtml, invoiceCount: invoices.length });
 });
 
 app.get('/api/runs/:id/status', (req, res) => {
   const run = getRun(Number(req.params.id));
   if (!run) return res.status(404).json({ error: 'Not found' });
   res.json({ status: run.status });
+});
+
+// ---------------------------------------------------------------------------
+// Invoices
+// ---------------------------------------------------------------------------
+
+app.get('/runs/:id/invoices', (req, res) => {
+  const run = getRun(Number(req.params.id));
+  if (!run) return res.status(404).send('Run not found');
+
+  if (run.account_id) {
+    const account = getAccount(run.account_id);
+    run.account_name = account ? account.name : null;
+  }
+
+  const invoices = getInvoices(run.id);
+  render(res, 'invoices', { title: 'Invoices — Run #' + run.id, run, invoices });
+});
+
+app.get('/runs/:runId/invoices/:invoiceNumber/pdf', async (req, res) => {
+  const run = getRun(Number(req.params.runId));
+  if (!run) return res.status(404).send('Run not found');
+
+  // Get the account's API credentials for authentication
+  if (!run.account_id) {
+    return res.status(400).send('Cannot download PDF: run has no associated account (CLI runs do not store credentials).');
+  }
+
+  const account = getAccount(run.account_id);
+  if (!account) return res.status(404).send('Account not found');
+
+  const invoiceNumber = req.params.invoiceNumber;
+  const pdfUrl = `https://www.mybring.com/invoicearchive/pdf/${account.customer_number}/${invoiceNumber}.pdf`;
+
+  try {
+    const result = await httpsGet(pdfUrl, {
+      'X-Mybring-API-Uid': account.api_uid,
+      'X-Mybring-API-Key': account.api_key,
+    });
+
+    if (result.status !== 200) {
+      return res.status(result.status).send(`Failed to download PDF: ${result.status}`);
+    }
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${invoiceNumber}.pdf"`);
+    res.send(result.body);
+  } catch (error) {
+    console.error(`PDF proxy error: ${error.message}`);
+    res.status(500).send('Failed to download PDF from Bring');
+  }
 });
 
 // ---------------------------------------------------------------------------

@@ -1,0 +1,53 @@
+<hgroup>
+  <h1>Invoices</h1>
+  <p>
+    Run #<%= run.id %>
+    <% if (run.account_name) { %>&middot; <%= run.account_name %><% } %>
+    &middot; Customer <code><%= run.customer_number %></code>
+  </p>
+</hgroup>
+
+<% if (invoices.length === 0) { %>
+  <p>No invoices found for this run.</p>
+<% } else { %>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Invoice Number</th>
+          <th>Date</th>
+          <th>Amount</th>
+          <th>Currency</th>
+          <th>Specification</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        <% for (const inv of invoices) { %>
+          <tr>
+            <td><code><%= inv.invoice_number %></code></td>
+            <td><%= inv.invoice_date %></td>
+            <td><%= inv.total_amount != null ? inv.total_amount.toFixed(2) : '—' %></td>
+            <td><%= inv.currency || '—' %></td>
+            <td><%= inv.specification_available ? 'Yes' : 'No' %></td>
+            <td>
+              <% if (run.account_id) { %>
+                <a href="/runs/<%= run.id %>/invoices/<%= inv.invoice_number %>/pdf">Download PDF</a>
+              <% } else { %>
+                <small class="muted">N/A (CLI run)</small>
+              <% } %>
+            </td>
+          </tr>
+        <% } %>
+      </tbody>
+    </table>
+  </div>
+<% } %>
+
+<div class="actions mt-2">
+  <a href="/runs/<%= run.id %>" role="button" class="outline secondary">Back to Run</a>
+  <% if (run.account_id) { %>
+    <a href="/accounts/<%= run.account_id %>/runs" role="button" class="outline secondary">All Runs</a>
+  <% } %>
+  <a href="/" role="button" class="outline secondary">Dashboard</a>
+</div>

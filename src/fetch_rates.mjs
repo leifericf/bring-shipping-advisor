@@ -1,20 +1,21 @@
-import fs from 'fs';
-import { join } from 'path';
-import { loadEnv, getOutputDir, getAuthHeaders, sleep, fetchWithRetry, csvRow } from './lib.mjs';
+import { getAuthHeaders, sleep, fetchWithRetry } from './lib.mjs';
 import { loadConfig } from './config.mjs';
 import { getDb, insertShippingRates, insertZones, closeDb } from './db.mjs';
 
-const env = loadEnv();
+const RUN_ID = Number(process.env.RUN_ID);
+if (!RUN_ID) {
+  console.error('Error: RUN_ID environment variable is required. Use "npm start" or the web UI.');
+  process.exit(1);
+}
+
 const config = loadConfig();
 
-const API_UID = env.BRING_API_UID;
-const API_KEY = env.BRING_API_KEY;
-const CUSTOMER_NUMBER = env.BRING_CUSTOMER_NUMBER;
-const ORIGIN_POSTAL_CODE = env.BRING_ORIGIN_POSTAL_CODE || '0174';
-const OUTPUT_DIR = getOutputDir(CUSTOMER_NUMBER);
-const RUN_ID = process.env.RUN_ID ? Number(process.env.RUN_ID) : null;
+const API_UID = process.env.BRING_API_UID;
+const API_KEY = process.env.BRING_API_KEY;
+const CUSTOMER_NUMBER = process.env.BRING_CUSTOMER_NUMBER;
+const ORIGIN_POSTAL_CODE = process.env.BRING_ORIGIN_POSTAL_CODE || '0174';
+const env = { BRING_API_UID: API_UID, BRING_API_KEY: API_KEY };
 
-// Read from config
 const ORIGIN_COUNTRY = config.originCountry;
 const DESTINATIONS = config.destinations;
 const DOMESTIC_SERVICES = config.domesticServices;
@@ -80,12 +81,12 @@ async function fetchRates(destination, service, weightGrams) {
 }
 
 async function main() {
-  fs.mkdirSync(OUTPUT_DIR, { recursive: true });
+  // Ensure DB is initialized
+  getDb();
 
   console.log('Fetching Bring shipping rates...\n');
   console.log(`Origin: ${ORIGIN_POSTAL_CODE}, ${ORIGIN_COUNTRY}`);
   console.log(`Customer Number: ${CUSTOMER_NUMBER}`);
-  console.log(`Output: ${OUTPUT_DIR}`);
   console.log(`Weight tiers: ${WEIGHTS_GRAMS.map(w => `${w}g`).join(', ')}\n`);
 
   const results = [];
@@ -139,14 +140,7 @@ async function main() {
     }
   }
 
-  // Write shipping_rates.csv
-  const csvHeader = 'country,country_code,postal_code,zone,service_id,service_name,weight_g,price_nok';
-  const csvRows = results.map(r =>
-    csvRow([r.country, r.country_code, r.postal_code, r.zone, r.service_id, r.service_name, r.weight_g, r.price_nok])
-  );
-  fs.writeFileSync(join(OUTPUT_DIR, 'shipping_rates.csv'), [csvHeader, ...csvRows].join('\n'));
-
-  // Generate zones.csv — note: zones can differ per service for the same postal code
+  // Build zone map from results
   const zonesMap = new Map();
   for (const r of results) {
     const key = `${r.country_code}_${r.postal_code}_${r.service_id}`;
@@ -159,22 +153,15 @@ async function main() {
       });
     }
   }
-  const zonesHeader = 'country_code,postal_code,service_id,zone';
   const zonesList = [...zonesMap.values()]
     .sort((a, b) => a.country_code.localeCompare(b.country_code) || a.postal_code.localeCompare(b.postal_code));
-  const zonesRows = zonesList.map(z => csvRow([z.country_code, z.postal_code, z.service_id, z.zone]));
-  fs.writeFileSync(join(OUTPUT_DIR, 'zones.csv'), [zonesHeader, ...zonesRows].join('\n'));
 
-  // Write to database if we have a run ID
-  if (RUN_ID) {
-    insertShippingRates(RUN_ID, results);
-    insertZones(RUN_ID, zonesList);
-    closeDb();
-  }
+  // Write to database
+  insertShippingRates(RUN_ID, results);
+  insertZones(RUN_ID, zonesList);
+  closeDb();
 
   console.log(`\n\nDone! Fetched ${results.length} rates.`);
-  console.log(`Results saved to ${OUTPUT_DIR}/shipping_rates.csv`);
-  console.log(`Zones saved to ${OUTPUT_DIR}/zones.csv`);
 }
 
 main().catch(console.error);

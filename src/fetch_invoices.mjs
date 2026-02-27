@@ -1,17 +1,19 @@
-import fs from 'fs';
-import { join } from 'path';
-import { loadEnv, getOutputDir, getAuthHeaders, sleep, fetchWithRetry, httpsGet, csvRow } from './lib.mjs';
-import { insertInvoiceLineItems, closeDb } from './db.mjs';
+import { getAuthHeaders, sleep, fetchWithRetry, httpsGet } from './lib.mjs';
+import { getDb, insertInvoices, insertInvoiceLineItems, closeDb } from './db.mjs';
 
-const env = loadEnv();
+const RUN_ID = Number(process.env.RUN_ID);
+if (!RUN_ID) {
+  console.error('Error: RUN_ID environment variable is required. Use "npm start" or the web UI.');
+  process.exit(1);
+}
 
-const CUSTOMER_NUMBER = env.BRING_CUSTOMER_NUMBER;
-const OUTPUT_DIR = getOutputDir(CUSTOMER_NUMBER);
+const API_UID = process.env.BRING_API_UID;
+const API_KEY = process.env.BRING_API_KEY;
+const CUSTOMER_NUMBER = process.env.BRING_CUSTOMER_NUMBER;
+const env = { BRING_API_UID: API_UID, BRING_API_KEY: API_KEY };
 const AUTH_HEADERS = getAuthHeaders(env);
-const RUN_ID = process.env.RUN_ID ? Number(process.env.RUN_ID) : null;
 
 const INVOICES_URL = 'https://www.mybring.com/invoicearchive/api/invoices';
-const INVOICE_PDF_URL = 'https://www.mybring.com/invoicearchive/pdf';
 const REPORTS_GENERATE_URL = 'https://www.mybring.com/reports/api/generate';
 
 async function fetchJson(url) {
@@ -36,16 +38,7 @@ async function fetchXml(url) {
   return result.body.toString('utf8');
 }
 
-async function downloadPdf(invoiceNumber, outputPath) {
-  const url = `${INVOICE_PDF_URL}/${CUSTOMER_NUMBER}/${invoiceNumber}.pdf`;
-  const result = await httpsGet(url, AUTH_HEADERS);
-  if (result.status !== 200) {
-    throw new Error(`PDF download failed: ${result.status}`);
-  }
-  fs.writeFileSync(outputPath, result.body);
-}
-
-async function getInvoices() {
+async function getInvoiceList() {
   const data = await fetchJson(`${INVOICES_URL}/${CUSTOMER_NUMBER}.json`);
   return data.invoices || [];
 }
@@ -100,30 +93,30 @@ function parseXmlInvoice(xml) {
 }
 
 async function main() {
-  fs.mkdirSync(join(OUTPUT_DIR, 'invoices'), { recursive: true });
+  // Ensure DB is initialized
+  getDb();
 
   console.log('Fetching invoices...\n');
-  console.log(`Customer Number: ${CUSTOMER_NUMBER}`);
-  console.log(`Output: ${OUTPUT_DIR}\n`);
+  console.log(`Customer Number: ${CUSTOMER_NUMBER}\n`);
 
-  const invoices = await getInvoices();
+  const invoices = await getInvoiceList();
   console.log(`Found ${invoices.length} invoices\n`);
+
+  // Store invoice metadata in database
+  const invoiceRecords = invoices.map(inv => ({
+    invoiceNumber: inv.invoiceNumber,
+    invoiceDate: inv.invoiceDate,
+    totalAmount: inv.totalAmount,
+    currency: inv.currency,
+    specificationAvailable: inv.invoiceSpecificationAvailable,
+  }));
+  insertInvoices(RUN_ID, invoiceRecords);
 
   const allLineItems = [];
 
   for (const invoice of invoices) {
     console.log(`Processing invoice ${invoice.invoiceNumber} (${invoice.invoiceDate})...`);
     console.log(`  Amount: ${invoice.totalAmount} ${invoice.currency}`);
-
-    // Download PDF
-    console.log('  Downloading PDF...');
-    const pdfPath = join(OUTPUT_DIR, 'invoices', `${invoice.invoiceNumber}.pdf`);
-    try {
-      await downloadPdf(invoice.invoiceNumber, pdfPath);
-      console.log(`  Saved to invoices/${invoice.invoiceNumber}.pdf`);
-    } catch (error) {
-      console.log(`  PDF download failed: ${error.message}`);
-    }
 
     if (!invoice.invoiceSpecificationAvailable) {
       console.log('  No specification available, skipping line items...\n');
@@ -169,24 +162,11 @@ async function main() {
     console.log(`  Avg weight: ${avgWeight} kg\n`);
   }
 
-  const csvHeader = 'invoice_number,invoice_date,shipment_number,package_number,product_code,product,description,weight_kg,gross_price,discount,agreement_price,currency,from_postal_code,to_postal_code,to_city,to_country';
-  const csvRows = allLineItems.map(l =>
-    csvRow([
-      l.invoiceNumber, l.invoiceDate, l.shipmentNumber, l.packageNumber,
-      l.productCode, l.product, l.description, l.weightKg || '',
-      l.grossPrice, l.discount, l.agreementPrice, l.currency,
-      l.fromPostalCode, l.toPostalCode, l.toCity, l.toCountry,
-    ])
-  );
-  fs.writeFileSync(join(OUTPUT_DIR, 'invoice_line_items.csv'), [csvHeader, ...csvRows].join('\n'));
+  // Write line items to database
+  insertInvoiceLineItems(RUN_ID, allLineItems);
+  closeDb();
 
-  // Write to database if we have a run ID
-  if (RUN_ID) {
-    insertInvoiceLineItems(RUN_ID, allLineItems);
-    closeDb();
-  }
-
-  console.log(`\nSaved ${allLineItems.length} line items to ${OUTPUT_DIR}/invoice_line_items.csv`);
+  console.log(`Saved ${invoices.length} invoices and ${allLineItems.length} line items to database.`);
 }
 
 main().catch(console.error);

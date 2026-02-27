@@ -4,7 +4,7 @@ Tools to fetch and analyze shipping rates from Bring (Posten) for Shopify stores
 
 ## Overview
 
-This project fetches shipping rates and invoice data from the Bring API to help determine optimal shipping rates to charge customers.
+This project fetches shipping rates and invoice data from the Bring API to help determine optimal shipping rates to charge customers. All data is stored in a local SQLite database.
 
 ## Project Structure
 
@@ -16,27 +16,19 @@ bring-shipping-analyzer/
 ├── .env.example            # Environment template (for CLI usage)
 ├── .env                    # Your credentials for CLI usage (git-ignored)
 ├── src/
-│   ├── lib.mjs             # Shared utilities (env, CSV, fetch helpers)
+│   ├── lib.mjs             # Shared utilities (fetch helpers, auth headers)
 │   ├── config.mjs          # Config loader and validation
 │   ├── db.mjs              # SQLite database layer
 │   ├── server.mjs          # Web UI (Express server)
 │   ├── run.mjs             # Pipeline entry point - runs all scripts
 │   ├── fetch_rates.mjs     # Fetch shipping rates from Bring API
-│   ├── fetch_invoices.mjs  # Fetch invoice data and PDFs from Bring API
+│   ├── fetch_invoices.mjs  # Fetch invoice data from Bring API
 │   ├── analyze.mjs         # Analyze data and generate recommendations
 │   ├── views/              # EJS templates for the web UI
 │   └── public/             # Static CSS for the web UI
-└── data/                   # Output files (git-ignored)
-    ├── bring.db            # SQLite database (all run history)
-    └── <YYYY-MM-DD>_<customer>/    # One folder per day per customer
-        ├── shipping_rates.csv      # All shipping rates
-        ├── zones.csv               # Postal code to zone mapping
-        ├── invoice_line_items.csv  # Line items from invoices
-        ├── invoices/               # Downloaded PDF invoices
-        └── RESULTS.md              # Analysis and recommendations
+└── data/                   # SQLite database (git-ignored)
+    └── bring.db            # All run history, rates, invoices, and analysis
 ```
-
-Each run creates a new timestamped folder in `data/` and a new record in the SQLite database, so historical data is preserved and multiple Bring customers can be analyzed.
 
 ## Setup
 
@@ -74,7 +66,7 @@ BRING_API_UID=your-email@example.com
 BRING_API_KEY=your-api-key-here
 BRING_CUSTOMER_NUMBER=your-customer-number-here
 # Postal code where packages are shipped from (default: 0174)
-BRING_ORIGIN_POSTAL_CODE=0562
+BRING_ORIGIN_POSTAL_CODE=0174
 ```
 
 **Important**: Never commit `.env` to git.
@@ -106,6 +98,7 @@ Open http://localhost:3000 in your browser. From the web UI you can:
 2. **Edit configuration** — customize destinations, services, weight tiers, and analysis settings per account
 3. **Start runs** — fetch rates and invoices with one click (runs in background)
 4. **View results** — see the analysis report rendered as a web page
+5. **Browse invoices** — list all invoices for a run and download individual PDFs on demand
 
 The web UI stores credentials in the local SQLite database. No `.env` file is needed when using the web UI.
 
@@ -117,44 +110,17 @@ Run the full pipeline from the command line (uses `.env` for credentials):
 npm start
 ```
 
-Or directly:
+This runs all steps in order: fetch rates → fetch invoices → analyze data. Results are printed to stdout and saved to the database.
 
-```bash
-node src/run.mjs
-```
-
-This runs all scripts in order: fetch rates → fetch invoices → analyze data.
-
-### Individual Scripts
-
-You can also run scripts individually:
-
-```bash
-npm run fetch:rates       # Fetch shipping rates
-npm run fetch:invoices    # Fetch invoices and PDFs
-npm run analyze           # Generate recommendations
-```
-
-When run individually, scripts still write to CSV files. The database is only populated when using the full pipeline (`npm start`) or the web UI.
-
-### Script Details
+### Pipeline Steps
 
 #### fetch_rates.mjs
 
-Fetches shipping rates for all destinations and services defined in `config.json`.
-
-Output: `data/<timestamp>_<customer>/shipping_rates.csv`
+Fetches shipping rates for all destinations and services defined in the configuration.
 
 #### fetch_invoices.mjs
 
-Fetches:
-- List of all invoices from your account
-- Detailed line items per invoice
-- PDF downloads of each invoice
-
-Output:
-- `data/<timestamp>_<customer>/invoice_line_items.csv`
-- `data/<timestamp>_<customer>/invoices/*.pdf`
+Fetches invoice metadata and detailed line items per invoice from Mybring.
 
 #### analyze.mjs
 
@@ -165,15 +131,14 @@ Analyzes the fetched data and generates:
 - Road toll average derived from invoice data
 - Profitability analysis cross-referencing invoice costs vs. suggested rates
 
-Output: `data/<timestamp>_<customer>/RESULTS.md`
-
 ## Database
 
-All run data is stored in a SQLite database at `data/bring.db`. This enables:
+All data is stored in a SQLite database at `data/bring.db`. This enables:
 
 - **Historical comparison** — compare rates across different dates
+- **Multi-account** — manage multiple Bring customers
 - **Querying** — use any SQLite tool to explore your data
-- **Web UI** — powers the account management, run history, and results views
+- **Web UI** — powers account management, run history, invoices, and results
 
 The database contains these tables:
 
@@ -183,8 +148,9 @@ The database contains these tables:
 | `runs` | Run metadata (date, account, config snapshot, status) |
 | `shipping_rates` | All fetched shipping rates per run |
 | `zones` | Postal code to zone mappings per run |
+| `invoices` | Invoice metadata (number, date, amount) per run |
 | `invoice_line_items` | Invoice line items per run |
-| `analysis_results` | Generated RESULTS.md content per run |
+| `analysis_results` | Generated analysis report per run |
 
 You can query it directly:
 
@@ -210,7 +176,7 @@ sqlite3 data/bring.db "SELECT run_id, country, weight_g, price_nok FROM shipping
 
 ## Norway Zone System
 
-Norway has 7 shipping zones based on distance from the origin postal code. The scripts sample postal codes from each zone to show the full price range.
+Norway has 7 shipping zones based on distance from the origin postal code. The analysis samples postal codes from each zone to show the full price range.
 
 Note: Zone numbers can differ per service for the same postal code (e.g., service 5600 uses different zones than 3584).
 
@@ -225,7 +191,7 @@ Note: Zone numbers can differ per service for the same postal code (e.g., servic
 |-----|---------|
 | Shipping Guide API | Get shipping rates |
 | Invoice API | List invoices |
-| Invoice PDF API | Download invoice PDFs |
+| Invoice PDF API | Download invoice PDFs (on demand via web UI) |
 | Reports API | Generate invoice specifications |
 
 All APIs are read-only and require authentication via `X-Mybring-API-Uid` and `X-Mybring-API-Key` headers.
