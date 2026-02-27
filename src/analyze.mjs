@@ -224,13 +224,18 @@ Prices rounded up to the next "nice" price ending in 9.
     md += `| ${bracket.name} | ${cells.join(' | ')} |\n`;
   }
 
+  // International: PICKUP_PARCEL has a minimum price covering up to 1kg,
+  // so 0–1kg is a single bracket. Only two distinct price tiers exist.
+  const intlBracketWeights = ['250', '5000'];
+  const intlBracketNames = ['0–1 kg', '1 kg+'];
+
   md += `\n### International — PICKUP_PARCEL (no VAT)
 
-| Country | 0–0.5 kg | 0.5–1 kg | 1 kg+ |
-|---------|----------|----------|-------|
-`;
+PICKUP_PARCEL has a minimum price that covers all packages up to 1 kg, so only two weight brackets are needed.
 
-  const intlBracketWeights = ['250', '1000', '5000'];
+| Country | 0–1 kg | 1 kg+ |
+|---------|--------|-------|
+`;
 
   for (const [code, name] of Object.entries(countryNames)) {
     const cells = intlBracketWeights.map(w => {
@@ -245,7 +250,7 @@ Prices rounded up to the next "nice" price ending in 9.
   }
 
   // Simplified recommendation
-  // Group Nordics (SE/DK/FI) and remote (IS/GL/FO) — use the highest price in each group
+  // Group Nordics (SE/DK/FI) and remote (IS/GL/FO/JP) — use the highest price in each group
   const nordicMax = {};
   const remoteMax = {};
   for (const w of intlBracketWeights) {
@@ -255,7 +260,8 @@ Prices rounded up to the next "nice" price ending in 9.
     });
     nordicMax[w] = nicePrice(Math.max(...nordicPrices));
 
-    const remotePrices = ['IS', 'GL', 'FO'].map(code => {
+    const remoteCodes = Object.keys(countryNames).filter(c => !['SE', 'DK', 'FI'].includes(c));
+    const remotePrices = remoteCodes.map(code => {
       const r = rates.find(r => r.country_code === code && r.service_id === 'PICKUP_PARCEL' && r.weight_g === w);
       return r ? Math.ceil(parseFloat(r.price_nok)) : 0;
     });
@@ -268,15 +274,21 @@ Prices rounded up to the next "nice" price ending in 9.
     return rate ? `${nicePrice(Math.ceil((parseFloat(rate.price_nok) + roadToll) * 1.25))} kr` : 'N/A';
   });
 
+  const remoteCountryList = Object.entries(countryNames)
+    .filter(([code]) => !['SE', 'DK', 'FI'].includes(code))
+    .map(([, name]) => name)
+    .join(' / ');
+
   md += `\n### Simplified recommendation
 
 | Destination | 0–0.5 kg | 0.5–1 kg | 1 kg+ |
 |-------------|----------|----------|-------|
 | Norway | ${norwaySimple.join(' | ')} |
 | Sweden / Denmark / Finland | ${intlBracketWeights.map(w => `${nordicMax[w]} kr`).join(' | ')} |
-| Iceland / Greenland / Faroes | ${intlBracketWeights.map(w => `${remoteMax[w]} kr`).join(' | ')} |
+| ${remoteCountryList} | ${intlBracketWeights.map(w => `${remoteMax[w]} kr`).join(' | ')} |
 
 Norway uses Zone 3 pricing (covers most of the country). Nordic and remote groups use the highest price in each group so you never lose money.
+International only needs two Shopify weight brackets (0–1 kg and 1 kg+) since PICKUP_PARCEL pricing is flat up to 1 kg.
 
 `;
 
