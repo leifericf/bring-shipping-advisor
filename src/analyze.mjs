@@ -1,6 +1,12 @@
 import fs from 'fs';
 import { join } from 'path';
 import { DATA_DIR, parseCsv } from './lib.mjs';
+import { loadConfig } from './config.mjs';
+import { getDb, getShippingRates, getInvoiceLineItems, insertAnalysisResult, closeDb } from './db.mjs';
+
+const config = loadConfig();
+const analysis = config.analysis;
+const RUN_ID = process.env.RUN_ID ? Number(process.env.RUN_ID) : null;
 
 /**
  * Round up to the next "nice" price ending in 9 (e.g. 59, 79, 149, 999).
@@ -100,27 +106,32 @@ function buildShipmentProfiles(lineItems) {
  * Cross-references actual invoice costs against suggested Shopify rates.
  */
 function generateProfitabilitySection(lineItems, rates, roadToll) {
+  const primaryService = analysis.primaryDomesticService;
+  const safeZone = analysis.safeDefaultZone;
+  const vatMultiplier = analysis.vatMultiplier;
+
   const shipments = buildShipmentProfiles(lineItems);
-  const norway3584 = rates.filter(r => r.country_code === 'NO' && r.service_id === '3584');
+  const domesticRates = rates.filter(r => r.country_code === config.originCountry && r.service_id === primaryService);
 
-  const brackets = [
-    { name: '0–0.5 kg', maxWeight: 0.5, rateWeight: '250', shipments: [] },
-    { name: '0.5–1 kg', maxWeight: 1.0, rateWeight: '1000', shipments: [] },
-    { name: '1 kg+', maxWeight: Infinity, rateWeight: '5000', shipments: [] },
-  ];
+  const brackets = analysis.domesticShopifyBrackets.map(b => ({
+    name: b.name,
+    maxWeight: b.maxWeight ?? Infinity,
+    rateWeight: b.rateWeight,
+    shipments: [],
+  }));
 
-  // Compute suggested Shopify price for each bracket from Zone 3 rates
+  // Compute suggested Shopify price for each bracket from safe default zone rates
   for (const bracket of brackets) {
-    const rate = norway3584.find(r => r.zone === '3' && r.weight_g === bracket.rateWeight);
+    const rate = domesticRates.find(r => r.zone === safeZone && String(r.weight_g) === bracket.rateWeight);
     if (rate) {
-      bracket.shopifyPrice = nicePrice(Math.ceil((parseFloat(rate.price_nok) + roadToll) * 1.25));
-      bracket.revenueExVat = bracket.shopifyPrice / 1.25;
+      bracket.shopifyPrice = nicePrice(Math.ceil((parseFloat(rate.price_nok) + roadToll) * vatMultiplier));
+      bracket.revenueExVat = bracket.shopifyPrice / vatMultiplier;
     }
   }
 
-  // Assign domestic 3584 shipments to brackets
+  // Assign domestic shipments to brackets
   for (const [, s] of shipments) {
-    if (s.productCode !== '3584' || s.weight === null) continue;
+    if (s.productCode !== primaryService || s.weight === null) continue;
     const bracket = brackets.find(b => s.weight <= b.maxWeight);
     if (bracket) {
       bracket.shipments.push({
@@ -137,8 +148,8 @@ function generateProfitabilitySection(lineItems, rates, roadToll) {
   const totalShipments = brackets.reduce((sum, b) => sum + b.shipments.length, 0);
 
   let md = `## Profitability Analysis\n\n`;
-  md += `Based on ${totalShipments} domestic shipments (service 3584) from invoice data,\n`;
-  md += `projected against suggested Shopify rates (Zone 3 pricing).\n`;
+  md += `Based on ${totalShipments} domestic shipments (service ${primaryService}) from invoice data,\n`;
+  md += `projected against suggested Shopify rates (Zone ${safeZone} pricing).\n`;
   md += `Cost = actual invoice cost per shipment (parcel + road toll + any surcharges).\n\n`;
 
   // Per-bracket summary table
@@ -195,7 +206,7 @@ function generateProfitabilitySection(lineItems, rates, roadToll) {
     lossMaking.sort((a, b) => a.margin - b.margin); // worst first
 
     md += `### Loss-Making Shipments\n\n`;
-    md += `${lossMaking.length} out of ${totalShipments} shipments would still lose money at Zone 3 pricing:\n\n`;
+    md += `${lossMaking.length} out of ${totalShipments} shipments would still lose money at Zone ${safeZone} pricing:\n\n`;
     md += `| Bracket | City | Postal Code | Weight | Cost | Revenue ex VAT | Loss |\n`;
     md += `|---------|------|------------|--------|------|----------------|------|\n`;
 
@@ -203,10 +214,10 @@ function generateProfitabilitySection(lineItems, rates, roadToll) {
       md += `| ${s.bracket} | ${s.toCity} | ${s.toPostalCode} | ${s.weight} kg | ${s.totalCost.toFixed(2)} NOK | ${s.revenueExVat.toFixed(2)} NOK | ${s.margin.toFixed(2)} NOK |\n`;
     }
 
-    md += `\nThese are shipments to remote zones where Zone 3 pricing doesn't fully cover costs.\n`;
+    md += `\nThese are shipments to remote zones where Zone ${safeZone} pricing doesn't fully cover costs.\n`;
     md += `Consider whether the volume to these areas justifies raising prices further.\n\n`;
   } else {
-    md += `All ${totalShipments} shipments would be profitable at the suggested Zone 3 rates.\n\n`;
+    md += `All ${totalShipments} shipments would be profitable at the suggested Zone ${safeZone} rates.\n\n`;
   }
 
   // Worst case per bracket
@@ -234,15 +245,23 @@ function generateResultsMd(rates, invoiceAnalysis, lineItems) {
   const { byProduct, avgRoadToll } = invoiceAnalysis;
   const roadToll = Math.round(avgRoadToll * 100) / 100;
 
+  const primaryService = analysis.primaryDomesticService;
+  const cheapestIntl = analysis.cheapestInternationalService;
+  const vatMultiplier = analysis.vatMultiplier;
+  const safeZone = analysis.safeDefaultZone;
+  const zoneCount = analysis.domesticZoneCount;
+  const countryNames = config.countryNames;
+  const { nordic: nordicCodes, remote: remoteCodes } = analysis.countryGroupings;
+
   let md = `# Shipping Rate Analysis
 
 Generated: ${new Date().toISOString()}
 
 ## Key Findings
 
-1. **Main service used**: \`3584\` (Home Mailbox Parcel) - cheapest domestic option
-2. **3584 is Norway-only** - not available for international shipping
-3. **International shipping** uses \`PICKUP_PARCEL\` - cheapest option
+1. **Main service used**: \`${primaryService}\` (Home Mailbox Parcel) - cheapest domestic option
+2. **${primaryService} is Norway-only** - not available for international shipping
+3. **International shipping** uses \`${cheapestIntl}\` - cheapest option
 4. **Road toll**: ~${roadToll} NOK per shipment (Norway only, derived from invoice data)
 
 `;
@@ -270,143 +289,136 @@ Generated: ${new Date().toISOString()}
   }
 
   // Norway rate recommendations
-  const norway3584 = rates.filter(r => r.country_code === 'NO' && r.service_id === '3584');
-
-  const weightTiers = [
-    { name: '0-250g', key: '250' },
-    { name: '250-750g', key: '750' },
-    { name: '750g-1kg', key: '1000' },
-    { name: '1-5kg', key: '5000' },
-  ];
+  const domesticRates = rates.filter(r => r.country_code === config.originCountry && r.service_id === primaryService);
+  const weightTiers = analysis.domesticWeightTiers;
 
   md += `## Recommended Shipping Rates
 
-### Norway (includes 25% VAT)
+### Norway (includes ${Math.round((vatMultiplier - 1) * 100)}% VAT)
 
 **Zone 1 (Oslo area) — optimistic pricing:**
 
-| Weight Tier | Cost ex VAT | + Road Toll | With 25% VAT |
+| Weight Tier | Cost ex VAT | + Road Toll | With ${Math.round((vatMultiplier - 1) * 100)}% VAT |
 |-------------|-------------|-------------|---------------|
 `;
 
   for (const tier of weightTiers) {
-    const zone1Rate = norway3584.find(r => r.zone === '1' && r.weight_g === tier.key);
+    const zone1Rate = domesticRates.find(r => r.zone === '1' && String(r.weight_g) === tier.key);
     if (zone1Rate) {
       const price = parseFloat(zone1Rate.price_nok);
       const withToll = price + roadToll;
-      const withVat = Math.ceil(withToll * 1.25);
+      const withVat = Math.ceil(withToll * vatMultiplier);
       md += `| ${tier.name} | ${price.toFixed(2)} NOK | ${withToll.toFixed(2)} NOK | ${withVat} NOK |\n`;
     }
   }
 
-  md += `\n**Zone 3 (Bergen/mid-Norway) — safer, covers most of Norway:**
+  md += `\n**Zone ${safeZone} (Bergen/mid-Norway) — safer, covers most of Norway:**
 
-| Weight Tier | Cost ex VAT | + Road Toll | With 25% VAT |
+| Weight Tier | Cost ex VAT | + Road Toll | With ${Math.round((vatMultiplier - 1) * 100)}% VAT |
 |-------------|-------------|-------------|---------------|
 `;
 
   for (const tier of weightTiers) {
-    const zone3Rate = norway3584.find(r => r.zone === '3' && r.weight_g === tier.key);
-    if (zone3Rate) {
-      const price = parseFloat(zone3Rate.price_nok);
+    const safeZoneRate = domesticRates.find(r => r.zone === safeZone && String(r.weight_g) === tier.key);
+    if (safeZoneRate) {
+      const price = parseFloat(safeZoneRate.price_nok);
       const withToll = price + roadToll;
-      const withVat = Math.ceil(withToll * 1.25);
+      const withVat = Math.ceil(withToll * vatMultiplier);
       md += `| ${tier.name} | ${price.toFixed(2)} NOK | ${withToll.toFixed(2)} NOK | ${withVat} NOK |\n`;
     }
   }
 
   // International recommendations
+  const intlWeightColumns = analysis.internationalWeightColumns;
+  const intlWeightHeaders = intlWeightColumns.map(w => {
+    const grams = parseInt(w, 10);
+    return grams >= 1000 ? `${grams / 1000}kg` : `${grams}g`;
+  });
+
   md += `\n### International (no VAT)
 
-| Country | 250g | 750g | 1kg | 5kg | 10kg | 20kg |
-|---------|------|------|-----|-----|------|------|
+| Country | ${intlWeightHeaders.join(' | ')} |
+|---------|${intlWeightHeaders.map(() => '------').join('|')}|
 `;
 
-  const countryNames = {
-    'SE': 'Sweden',
-    'DK': 'Denmark',
-    'FI': 'Finland',
-    'IS': 'Iceland',
-    'GL': 'Greenland',
-    'FO': 'Faroe Islands',
-    'JP': 'Japan',
-  };
-
-  const intlWeights = ['250', '750', '1000', '5000', '10000', '20000'];
-
   for (const [code, name] of Object.entries(countryNames)) {
-    const cells = intlWeights.map(w => {
+    const cells = intlWeightColumns.map(w => {
       const rate = rates.find(r =>
         r.country_code === code &&
-        r.service_id === 'PICKUP_PARCEL' &&
-        r.weight_g === w
+        r.service_id === cheapestIntl &&
+        String(r.weight_g) === w
       );
       return rate ? `${Math.ceil(parseFloat(rate.price_nok))} NOK` : 'N/A';
     });
     md += `| ${name} | ${cells.join(' | ')} |\n`;
   }
 
-  // Full zone pricing table for service 3584
-  md += `\n## Norway Zone Pricing (Service 3584)
+  // Full zone pricing table for primary domestic service
+  const zonePricingCols = analysis.zonePricingColumns;
+  const zonePricingHeaders = zonePricingCols.map(w => {
+    const grams = parseInt(w, 10);
+    return grams >= 1000 ? `${grams / 1000}kg` : `${grams}g`;
+  });
 
-| Zone | 250g | 750g | 1kg | 5kg |
-|------|------|------|-----|-----|
+  md += `\n## Norway Zone Pricing (Service ${primaryService})
+
+| Zone | ${zonePricingHeaders.join(' | ')} |
+|------|${zonePricingHeaders.map(() => '------').join('|')}|
 `;
 
-  for (let zone = 1; zone <= 7; zone++) {
+  for (let zone = 1; zone <= zoneCount; zone++) {
     const zoneStr = String(zone);
-    const cells = ['250', '750', '1000', '5000'].map(w => {
-      const rate = norway3584.find(r => r.zone === zoneStr && r.weight_g === w);
+    const cells = zonePricingCols.map(w => {
+      const rate = domesticRates.find(r => r.zone === zoneStr && String(r.weight_g) === w);
       return rate ? `${parseFloat(rate.price_nok).toFixed(2)} NOK` : 'N/A';
     });
     md += `| ${zone} | ${cells.join(' | ')} |\n`;
   }
 
   // Suggested Shopify rates — simplified tiers
-  const shopifyBrackets = [
-    { name: '0–0.5 kg', weight: '250' },
-    { name: '0.5–1 kg', weight: '1000' },
-    { name: '1 kg+', weight: '5000' },
-  ];
+  const shopifyBrackets = analysis.domesticShopifyBrackets.map(b => ({
+    name: b.name,
+    weight: b.rateWeight,
+  }));
+  const zonesForTable = analysis.zonesForShopifyTable;
+  const zoneLabels = { '1': 'Oslo', '3': 'Bergen', '7': 'Finnmark' };
 
   md += `\n## Suggested Shopify Rates
 
 Prices rounded up to the next "nice" price ending in 9.
 
-### Norway — Service 3584 (incl. road toll + 25% VAT)
+### Norway — Service ${primaryService} (incl. road toll + ${Math.round((vatMultiplier - 1) * 100)}% VAT)
 
-| Weight | Zone 1 (Oslo) | Zone 3 (Bergen) | Zone 7 (Finnmark) |
-|--------|--------------|-----------------|-------------------|
+| Weight | ${zonesForTable.map(z => `Zone ${z} (${zoneLabels[z] || z})`).join(' | ')} |
+|--------|${zonesForTable.map(() => '-------------------').join('|')}|
 `;
 
   for (const bracket of shopifyBrackets) {
-    const cells = ['1', '3', '7'].map(zone => {
-      const rate = norway3584.find(r => r.zone === zone && r.weight_g === bracket.weight);
+    const cells = zonesForTable.map(zone => {
+      const rate = domesticRates.find(r => r.zone === zone && String(r.weight_g) === bracket.weight);
       if (!rate) return 'N/A';
-      return `${nicePrice(Math.ceil((parseFloat(rate.price_nok) + roadToll) * 1.25))} kr`;
+      return `${nicePrice(Math.ceil((parseFloat(rate.price_nok) + roadToll) * vatMultiplier))} kr`;
     });
     md += `| ${bracket.name} | ${cells.join(' | ')} |\n`;
   }
 
-  // International: PICKUP_PARCEL has a minimum price covering up to 1kg,
-  // so 0–1kg is a single bracket. Only two distinct price tiers exist.
-  const intlBracketWeights = ['250', '5000'];
-  const intlBracketNames = ['0–1 kg', '1 kg+'];
+  // International Shopify brackets
+  const intlShopifyBrackets = analysis.internationalShopifyBrackets;
 
-  md += `\n### International — PICKUP_PARCEL (no VAT)
+  md += `\n### International — ${cheapestIntl} (no VAT)
 
-PICKUP_PARCEL has a minimum price that covers all packages up to 1 kg, so only two weight brackets are needed.
+${cheapestIntl} has a minimum price that covers all packages up to 1 kg, so only two weight brackets are needed.
 
-| Country | 0–1 kg | 1 kg+ |
-|---------|--------|-------|
+| Country | ${intlShopifyBrackets.map(b => b.name).join(' | ')} |
+|---------|${intlShopifyBrackets.map(() => '-------').join('|')}|
 `;
 
   for (const [code, name] of Object.entries(countryNames)) {
-    const cells = intlBracketWeights.map(w => {
+    const cells = intlShopifyBrackets.map(b => {
       const rate = rates.find(r =>
         r.country_code === code &&
-        r.service_id === 'PICKUP_PARCEL' &&
-        r.weight_g === w
+        r.service_id === cheapestIntl &&
+        String(r.weight_g) === b.weight
       );
       return rate ? `${nicePrice(Math.ceil(parseFloat(rate.price_nok)))} kr` : 'N/A';
     });
@@ -414,45 +426,43 @@ PICKUP_PARCEL has a minimum price that covers all packages up to 1 kg, so only t
   }
 
   // Simplified recommendation
-  // Group Nordics (SE/DK/FI) and remote (IS/GL/FO/JP) — use the highest price in each group
+  // Group Nordics and remote — use the highest price in each group
+  const intlBracketWeights = intlShopifyBrackets.map(b => b.weight);
   const nordicMax = {};
   const remoteMax = {};
   for (const w of intlBracketWeights) {
-    const nordicPrices = ['SE', 'DK', 'FI'].map(code => {
-      const r = rates.find(r => r.country_code === code && r.service_id === 'PICKUP_PARCEL' && r.weight_g === w);
+    const nordicPrices = nordicCodes.map(code => {
+      const r = rates.find(r => r.country_code === code && r.service_id === cheapestIntl && String(r.weight_g) === w);
       return r ? Math.ceil(parseFloat(r.price_nok)) : 0;
     });
     nordicMax[w] = nicePrice(Math.max(...nordicPrices));
 
-    const remoteCodes = Object.keys(countryNames).filter(c => !['SE', 'DK', 'FI'].includes(c));
     const remotePrices = remoteCodes.map(code => {
-      const r = rates.find(r => r.country_code === code && r.service_id === 'PICKUP_PARCEL' && r.weight_g === w);
+      const r = rates.find(r => r.country_code === code && r.service_id === cheapestIntl && String(r.weight_g) === w);
       return r ? Math.ceil(parseFloat(r.price_nok)) : 0;
     });
     remoteMax[w] = nicePrice(Math.max(...remotePrices));
   }
 
-  // Norway Zone 3 as safe default
+  // Safe default zone pricing for Norway
   const norwaySimple = shopifyBrackets.map(b => {
-    const rate = norway3584.find(r => r.zone === '3' && r.weight_g === b.weight);
-    return rate ? `${nicePrice(Math.ceil((parseFloat(rate.price_nok) + roadToll) * 1.25))} kr` : 'N/A';
+    const rate = domesticRates.find(r => r.zone === safeZone && String(r.weight_g) === b.weight);
+    return rate ? `${nicePrice(Math.ceil((parseFloat(rate.price_nok) + roadToll) * vatMultiplier))} kr` : 'N/A';
   });
 
-  const remoteCountryList = Object.entries(countryNames)
-    .filter(([code]) => !['SE', 'DK', 'FI'].includes(code))
-    .map(([, name]) => name)
-    .join(' / ');
+  const nordicCountryList = nordicCodes.map(c => countryNames[c]).filter(Boolean).join(' / ');
+  const remoteCountryList = remoteCodes.map(c => countryNames[c]).filter(Boolean).join(' / ');
 
   md += `\n### Simplified recommendation
 
-| Destination | 0–0.5 kg | 0.5–1 kg | 1 kg+ |
-|-------------|----------|----------|-------|
+| Destination | ${shopifyBrackets.map(b => b.name).join(' | ')} |
+|-------------|${shopifyBrackets.map(() => '----------').join('|')}|
 | Norway | ${norwaySimple.join(' | ')} |
-| Sweden / Denmark / Finland | ${intlBracketWeights.map(w => `${nordicMax[w]} kr`).join(' | ')} |
+| ${nordicCountryList} | ${intlBracketWeights.map(w => `${nordicMax[w]} kr`).join(' | ')} |
 | ${remoteCountryList} | ${intlBracketWeights.map(w => `${remoteMax[w]} kr`).join(' | ')} |
 
-Norway uses Zone 3 pricing (covers most of the country). Nordic and remote groups use the highest price in each group so you never lose money.
-International only needs two Shopify weight brackets (0–1 kg and 1 kg+) since PICKUP_PARCEL pricing is flat up to 1 kg.
+Norway uses Zone ${safeZone} pricing (covers most of the country). Nordic and remote groups use the highest price in each group so you never lose money.
+International only needs two Shopify weight brackets (${intlShopifyBrackets.map(b => b.name).join(' and ')}) since ${cheapestIntl} pricing is flat up to 1 kg.
 
 `;
 
@@ -460,10 +470,10 @@ International only needs two Shopify weight brackets (0–1 kg and 1 kg+) since 
 
   md += `## Notes
 
-- **Zone risk**: Zone 1 prices are cheapest. Shipping to Zone 7 (Finnmark) costs roughly 2x Zone 1.
-- **Weight limits**: 3584 max 5kg, PickUp Parcel max 20kg
+- **Zone risk**: Zone 1 prices are cheapest. Shipping to Zone ${zoneCount} (Finnmark) costs roughly 2x Zone 1.
+- **Weight limits**: ${primaryService} max 5kg, ${cheapestIntl} max 20kg
 - **Road toll**: ~${roadToll} NOK per Norway shipment (avg from invoices, included in recommendations above)
-- **Zone numbers can differ per service** for the same postal code — the zone table above is for service 3584 only
+- **Zone numbers can differ per service** for the same postal code — the zone table above is for service ${primaryService} only
 `;
 
   return md;
@@ -473,26 +483,45 @@ async function main() {
   const outputDir = process.env.OUTPUT_DIR || findLatestDataDir();
   console.log(`Analyzing data from: ${outputDir}\n`);
 
-  // Check for required files
-  const ratesPath = join(outputDir, 'shipping_rates.csv');
-  const invoicesPath = join(outputDir, 'invoice_line_items.csv');
+  let rates, lineItems;
 
-  if (!fs.existsSync(ratesPath)) {
-    console.error('shipping_rates.csv not found. Run fetch_rates.mjs first.');
-    process.exit(1);
+  // Prefer reading from database when we have a run ID
+  if (RUN_ID) {
+    console.log(`Reading data from database (run ${RUN_ID})...`);
+    rates = getShippingRates(RUN_ID).map(r => ({
+      ...r,
+      weight_g: String(r.weight_g),
+      price_nok: String(r.price_nok),
+    }));
+    lineItems = getInvoiceLineItems(RUN_ID).map(r => ({
+      ...r,
+      weight_kg: r.weight_kg != null ? String(r.weight_kg) : '',
+      agreement_price: String(r.agreement_price),
+      gross_price: String(r.gross_price),
+      discount: String(r.discount),
+    }));
+    console.log(`Loaded ${rates.length} shipping rates from DB`);
+    console.log(`Loaded ${lineItems.length} invoice line items from DB\n`);
+  } else {
+    // Fall back to CSV files
+    const ratesPath = join(outputDir, 'shipping_rates.csv');
+    const invoicesPath = join(outputDir, 'invoice_line_items.csv');
+
+    if (!fs.existsSync(ratesPath)) {
+      console.error('shipping_rates.csv not found. Run fetch_rates.mjs first.');
+      process.exit(1);
+    }
+
+    if (!fs.existsSync(invoicesPath)) {
+      console.error('invoice_line_items.csv not found. Run fetch_invoices.mjs first.');
+      process.exit(1);
+    }
+
+    rates = parseCsv(fs.readFileSync(ratesPath, 'utf8'));
+    lineItems = parseCsv(fs.readFileSync(invoicesPath, 'utf8'));
+    console.log(`Loaded ${rates.length} shipping rates`);
+    console.log(`Loaded ${lineItems.length} invoice line items\n`);
   }
-
-  if (!fs.existsSync(invoicesPath)) {
-    console.error('invoice_line_items.csv not found. Run fetch_invoices.mjs first.');
-    process.exit(1);
-  }
-
-  // Read and parse data
-  const rates = parseCsv(fs.readFileSync(ratesPath, 'utf8'));
-  const lineItems = parseCsv(fs.readFileSync(invoicesPath, 'utf8'));
-
-  console.log(`Loaded ${rates.length} shipping rates`);
-  console.log(`Loaded ${lineItems.length} invoice line items\n`);
 
   // Analyze
   const invoiceAnalysis = analyzeInvoices(lineItems);
@@ -500,6 +529,12 @@ async function main() {
   // Generate RESULTS.md
   const resultsMd = generateResultsMd(rates, invoiceAnalysis, lineItems);
   fs.writeFileSync(join(outputDir, 'RESULTS.md'), resultsMd);
+
+  // Save to database if we have a run ID
+  if (RUN_ID) {
+    insertAnalysisResult(RUN_ID, resultsMd);
+    closeDb();
+  }
 
   console.log(`Generated ${outputDir}/RESULTS.md`);
 }
