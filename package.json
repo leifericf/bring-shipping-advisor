@@ -8,6 +8,7 @@
   },
   "scripts": {
     "start": "node src/run.mjs",
+    "server": "node src/server.mjs",
     "fetch:rates": "node src/fetch_rates.mjs",
     "fetch:invoices": "node src/fetch_invoices.mjs",
     "analyze": "node src/analyze.mjs"
