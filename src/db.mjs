@@ -191,6 +191,18 @@ export function createRun(customerNumber, originPostalCode, configSnapshot, acco
   return result.lastInsertRowid;
 }
 
+export function deleteRun(id) {
+  const db = getDb();
+  db.transaction(() => {
+    db.prepare('DELETE FROM analysis_results WHERE run_id = ?').run(id);
+    db.prepare('DELETE FROM invoice_line_items WHERE run_id = ?').run(id);
+    db.prepare('DELETE FROM invoices WHERE run_id = ?').run(id);
+    db.prepare('DELETE FROM zones WHERE run_id = ?').run(id);
+    db.prepare('DELETE FROM shipping_rates WHERE run_id = ?').run(id);
+    db.prepare('DELETE FROM runs WHERE id = ?').run(id);
+  })();
+}
+
 export function updateRunStatus(runId, status) {
   const db = getDb();
   db.prepare('UPDATE runs SET status = ? WHERE id = ?').run(status, runId);

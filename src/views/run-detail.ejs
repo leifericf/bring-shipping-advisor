@@ -60,4 +60,8 @@
     <a href="/runs/<%= run.id %>/invoices" role="button" class="outline secondary">Invoices (<%= invoiceCount %>)</a>
   <% } %>
   <a href="/" role="button" class="outline secondary">Dashboard</a>
+  <form method="POST" action="/runs/<%= run.id %>/delete"
+        onsubmit="return confirm('Delete this run and all its data?')">
+    <button type="submit" class="outline btn-danger push-right">Delete Run</button>
+  </form>
 </div>

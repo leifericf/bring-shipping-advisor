@@ -11,7 +11,7 @@ import { DEFAULT_CONFIG_PATH } from './config.mjs';
 import {
   getDb, closeDb,
   getAllAccounts, getAccount, createAccount, updateAccount, updateAccountConfig, deleteAccount,
-  createRun as dbCreateRun, getRun, getRunsForAccount, getRecentRuns, getAnalysisResult,
+  createRun as dbCreateRun, getRun, deleteRun, getRunsForAccount, getRecentRuns, getAnalysisResult,
   getInvoices,
 } from './db.mjs';
 
@@ -198,6 +198,14 @@ app.get('/runs/:id', (req, res) => {
   const invoices = run.status === 'completed' ? getInvoices(run.id) : [];
 
   render(res, 'run-detail', { title: 'Run #' + run.id, run, resultsHtml, invoiceCount: invoices.length });
+});
+
+app.post('/runs/:id/delete', (req, res) => {
+  const run = getRun(Number(req.params.id));
+  if (!run) return res.status(404).send('Run not found');
+  const accountId = run.account_id;
+  deleteRun(run.id);
+  res.redirect(accountId ? `/accounts/${accountId}/runs` : '/');
 });
 
 app.get('/api/runs/:id/status', (req, res) => {
