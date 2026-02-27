@@ -10,10 +10,23 @@ export const DATA_DIR = join(ROOT_DIR, 'data');
 const REQUIRED_ENV_KEYS = ['BRING_API_UID', 'BRING_API_KEY', 'BRING_CUSTOMER_NUMBER'];
 
 /**
- * Parse a .env file into a plain object.
- * Supports # comments, blank lines, and optionally quoted values.
+ * Load credentials from process.env first, then fall back to .env file.
+ * This allows the web server to pass credentials via environment variables
+ * when spawning pipeline scripts for different accounts.
  */
 export function loadEnv() {
+  // Check if all required keys are already in process.env (set by server)
+  const fromProcessEnv = REQUIRED_ENV_KEYS.every(k => process.env[k]);
+
+  if (fromProcessEnv) {
+    const env = {};
+    for (const key of [...REQUIRED_ENV_KEYS, 'BRING_ORIGIN_POSTAL_CODE']) {
+      if (process.env[key]) env[key] = process.env[key];
+    }
+    return env;
+  }
+
+  // Fall back to .env file
   const envPath = join(ROOT_DIR, '.env');
   if (!fs.existsSync(envPath)) {
     console.error('Error: .env file not found. Copy .env.example to .env and fill in your credentials.');
