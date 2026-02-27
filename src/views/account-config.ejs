@@ -1,0 +1,48 @@
+<hgroup>
+  <h1>Configuration: <%= account.name %></h1>
+  <p>Edit destinations, services, weight tiers, and analysis settings for this account.</p>
+</hgroup>
+
+<form method="POST" action="/accounts/<%= account.id %>/config" id="config-form">
+  <p>
+    Edit the JSON configuration below. This controls which destinations, services, and weight tiers are
+    fetched, and how the analysis is performed.
+  </p>
+  <textarea name="config" class="config-editor" id="config-editor" spellcheck="false"><%= configJson %></textarea>
+
+  <div id="config-error" style="color: #dc3545; margin-top: 0.5rem; display: none;"></div>
+
+  <div class="inline-actions" style="margin-top: 1rem;">
+    <button type="submit">Save Configuration</button>
+    <button type="button" class="outline secondary" onclick="formatJson()">Format JSON</button>
+    <a href="/accounts/<%= account.id %>/runs" role="button" class="outline secondary">Back to Runs</a>
+  </div>
+</form>
+
+<script>
+function formatJson() {
+  const editor = document.getElementById('config-editor');
+  const errorEl = document.getElementById('config-error');
+  try {
+    const parsed = JSON.parse(editor.value);
+    editor.value = JSON.stringify(parsed, null, 2);
+    errorEl.style.display = 'none';
+  } catch (e) {
+    errorEl.textContent = 'Invalid JSON: ' + e.message;
+    errorEl.style.display = 'block';
+  }
+}
+
+document.getElementById('config-form').addEventListener('submit', function(e) {
+  const editor = document.getElementById('config-editor');
+  const errorEl = document.getElementById('config-error');
+  try {
+    JSON.parse(editor.value);
+    errorEl.style.display = 'none';
+  } catch (err) {
+    e.preventDefault();
+    errorEl.textContent = 'Cannot save — invalid JSON: ' + err.message;
+    errorEl.style.display = 'block';
+  }
+});
+</script>

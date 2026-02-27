@@ -1,0 +1,67 @@
+<h1>Dashboard</h1>
+
+<section>
+  <hgroup>
+    <h2>Accounts</h2>
+    <p><%= accounts.length %> account<%= accounts.length !== 1 ? 's' : '' %> configured</p>
+  </hgroup>
+
+  <% if (accounts.length === 0) { %>
+    <p>No accounts yet. <a href="/accounts/new">Create your first account</a> to get started.</p>
+  <% } else { %>
+    <div class="account-grid">
+      <% for (const account of accounts) { %>
+        <article>
+          <header><strong><%= account.name %></strong></header>
+          <p>
+            Customer: <code><%= account.customer_number %></code><br>
+            Origin: <code><%= account.origin_postal_code %></code>
+          </p>
+          <footer>
+            <div class="inline-actions">
+              <a href="/accounts/<%= account.id %>/runs" role="button" class="outline">Runs</a>
+              <a href="/accounts/<%= account.id %>/config" role="button" class="outline secondary">Config</a>
+              <a href="/accounts/<%= account.id %>/edit" role="button" class="outline secondary">Edit</a>
+            </div>
+          </footer>
+        </article>
+      <% } %>
+    </div>
+  <% } %>
+</section>
+
+<section>
+  <hgroup>
+    <h2>Recent Runs</h2>
+    <p>Latest pipeline runs across all accounts</p>
+  </hgroup>
+
+  <% if (recentRuns.length === 0) { %>
+    <p>No runs yet.</p>
+  <% } else { %>
+    <table>
+      <thead>
+        <tr>
+          <th>Run</th>
+          <th>Account</th>
+          <th>Customer</th>
+          <th>Date</th>
+          <th>Status</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        <% for (const run of recentRuns) { %>
+          <tr>
+            <td>#<%= run.id %></td>
+            <td><%= run.account_name || '(CLI)' %></td>
+            <td><code><%= run.customer_number %></code></td>
+            <td><%= run.created_at %></td>
+            <td><span class="status status-<%= run.status %>"><%= run.status %></span></td>
+            <td><a href="/runs/<%= run.id %>">View</a></td>
+          </tr>
+        <% } %>
+      </tbody>
+    </table>
+  <% } %>
+</section>

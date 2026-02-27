@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= typeof title !== 'undefined' ? title + ' — ' : '' %>Bring Shipping Rates</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="container">
+    <nav>
+      <ul>
+        <li><a href="/"><strong>Bring Shipping Rates</strong></a></li>
+      </ul>
+      <ul>
+        <li><a href="/">Dashboard</a></li>
+        <li><a href="/accounts/new">New Account</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main class="container">
+    <% if (typeof flash !== 'undefined' && flash) { %>
+      <article style="padding: 0.5rem 1rem; margin-bottom: 1rem;">
+        <%= flash %>
+      </article>
+    <% } %>
+
+    <%- body %>
+  </main>
+
+  <footer class="container">
+    <small>Bring Shipping Rates — Local Tool</small>
+  </footer>
+</body>
+</html>

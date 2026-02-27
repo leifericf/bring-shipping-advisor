@@ -1,0 +1,39 @@
+<hgroup>
+  <h1><%= account.name %></h1>
+  <p>Customer <code><%= account.customer_number %></code> &middot; Origin <code><%= account.origin_postal_code %></code></p>
+</hgroup>
+
+<div class="inline-actions" style="margin-bottom: 1.5rem;">
+  <form method="POST" action="/accounts/<%= account.id %>/runs">
+    <button type="submit">Start New Run</button>
+  </form>
+  <a href="/accounts/<%= account.id %>/config" role="button" class="outline secondary">Edit Config</a>
+  <a href="/accounts/<%= account.id %>/edit" role="button" class="outline secondary">Edit Account</a>
+</div>
+
+<h2>Runs</h2>
+
+<% if (runs.length === 0) { %>
+  <p>No runs yet. Click "Start New Run" to fetch rates and invoices.</p>
+<% } else { %>
+  <table>
+    <thead>
+      <tr>
+        <th>Run</th>
+        <th>Date</th>
+        <th>Status</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      <% for (const run of runs) { %>
+        <tr>
+          <td>#<%= run.id %></td>
+          <td><%= run.created_at %></td>
+          <td><span class="status status-<%= run.status %>"><%= run.status %></span></td>
+          <td><a href="/runs/<%= run.id %>">View</a></td>
+        </tr>
+      <% } %>
+    </tbody>
+  </table>
+<% } %>

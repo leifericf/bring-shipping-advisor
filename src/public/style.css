@@ -1,0 +1,55 @@
+/* Minimal overrides — Pico CSS handles most styling */
+
+/* Tighter table spacing */
+table td, table th {
+  padding: 0.4rem 0.6rem;
+}
+
+/* Status badges */
+.status {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+.status-completed { background: #d4edda; color: #155724; }
+.status-failed { background: #f8d7da; color: #721c24; }
+.status-pending,
+.status-fetching_rates,
+.status-fetching_invoices,
+.status-analyzing { background: #fff3cd; color: #856404; }
+
+/* Config editor */
+.config-editor {
+  font-family: monospace;
+  font-size: 0.85rem;
+  min-height: 500px;
+  width: 100%;
+  tab-size: 2;
+}
+
+/* Rendered markdown results */
+.results-content h1 { font-size: 1.6rem; }
+.results-content h2 { font-size: 1.3rem; margin-top: 2rem; }
+.results-content h3 { font-size: 1.1rem; margin-top: 1.5rem; }
+
+/* Account cards grid */
+.account-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem;
+}
+.account-grid article {
+  margin-bottom: 0;
+}
+
+/* Inline form buttons */
+.inline-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+.inline-actions form {
+  margin: 0;
+}

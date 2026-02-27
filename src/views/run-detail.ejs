@@ -1,0 +1,64 @@
+<hgroup>
+  <h1>Run #<%= run.id %></h1>
+  <p>
+    <% if (run.account_name) { %><%= run.account_name %> &middot; <% } %>
+    Customer <code><%= run.customer_number %></code> &middot;
+    <%= run.created_at %>
+  </p>
+</hgroup>
+
+<p>
+  Status: <span class="status status-<%= run.status %>" id="run-status"><%= run.status %></span>
+</p>
+
+<% if (run.status !== 'completed' && run.status !== 'failed') { %>
+  <article id="progress-box" aria-busy="true">
+    Pipeline is running... This page will update automatically.
+  </article>
+
+  <script>
+    (function poll() {
+      setTimeout(async () => {
+        try {
+          const res = await fetch('/api/runs/<%= run.id %>/status');
+          const data = await res.json();
+          document.getElementById('run-status').textContent = data.status;
+          document.getElementById('run-status').className = 'status status-' + data.status;
+
+          if (data.status === 'completed' || data.status === 'failed') {
+            // Reload to show results
+            window.location.reload();
+          } else {
+            document.getElementById('progress-box').innerHTML =
+              'Pipeline is running: <strong>' + data.status.replace(/_/g, ' ') + '</strong>...';
+            poll();
+          }
+        } catch (e) {
+          poll();
+        }
+      }, 3000);
+    })();
+  </script>
+<% } %>
+
+<% if (run.status === 'failed') { %>
+  <article style="border-color: #dc3545;">
+    The pipeline failed. Check the server console for details.
+  </article>
+<% } %>
+
+<% if (resultsHtml) { %>
+  <section class="results-content">
+    <%- resultsHtml %>
+  </section>
+<% } %>
+
+<div class="inline-actions" style="margin-top: 2rem;">
+  <% if (run.account_id) { %>
+    <a href="/accounts/<%= run.account_id %>/runs" role="button" class="outline secondary">Back to Runs</a>
+  <% } %>
+  <a href="/" role="button" class="outline secondary">Dashboard</a>
+  <% if (run.output_dir) { %>
+    <small style="margin-left: auto; color: var(--pico-muted-color);">Output: <code><%= run.output_dir %></code></small>
+  <% } %>
+</div>
