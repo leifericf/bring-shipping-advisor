@@ -10,17 +10,21 @@ This project fetches shipping rates and invoice data from the Bring API to help 
 
 ```
 bring-shipping-rates/
-├── README.md           # This file
-├── package.json        # Project metadata and npm scripts
-├── .env.example        # Environment template (copy to .env)
-├── .env                # Your credentials (git-ignored)
+├── README.md               # This file
+├── package.json            # Project metadata and npm scripts
+├── config.json             # Business configuration (destinations, services, weights, etc.)
+├── .env.example            # Environment template (copy to .env)
+├── .env                    # Your credentials (git-ignored)
 ├── src/
 │   ├── lib.mjs             # Shared utilities (env, CSV, fetch helpers)
+│   ├── config.mjs          # Config loader and validation
+│   ├── db.mjs              # SQLite database layer
 │   ├── run.mjs             # Entry point - runs all scripts
 │   ├── fetch_rates.mjs     # Fetch shipping rates from Bring API
 │   ├── fetch_invoices.mjs  # Fetch invoice data and PDFs from Bring API
 │   └── analyze.mjs         # Analyze data and generate recommendations
-└── data/                    # Output files (git-ignored)
+└── data/                   # Output files (git-ignored)
+    ├── bring.db            # SQLite database (all run history)
     └── <YYYY-MM-DD>_<customer>/    # One folder per day per customer
         ├── shipping_rates.csv      # All shipping rates
         ├── zones.csv               # Postal code to zone mapping
@@ -29,7 +33,7 @@ bring-shipping-rates/
         └── RESULTS.md              # Analysis and recommendations
 ```
 
-Each script run creates a new timestamped folder in `data/`, so historical data is preserved and multiple Bring customers can be analyzed in the same repo.
+Each run creates a new timestamped folder in `data/` and a new record in the SQLite database, so historical data is preserved and multiple Bring customers can be analyzed.
 
 ## Setup
 
@@ -45,23 +49,43 @@ Each script run creates a new timestamped folder in `data/`, so historical data 
 3. Create an API key
 4. Note your customer number (found on invoices or in Mybring)
 
+### Installation
+
+```bash
+npm install
+```
+
 ### Configuration
 
-1. Copy the example environment file:
-   ```bash
-   cp .env.example .env
-   ```
+There are two configuration files:
 
-2. Edit `.env` with your credentials:
-   ```
-   BRING_API_UID=your-email@example.com
-   BRING_API_KEY=your-api-key-here
-   BRING_CUSTOMER_NUMBER=your-customer-number-here
-   # Postal code where packages are shipped from (default: 0174)
-   BRING_ORIGIN_POSTAL_CODE=0562
-   ```
+#### 1. `.env` — Credentials (secret, git-ignored)
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env` with your credentials:
+```
+BRING_API_UID=your-email@example.com
+BRING_API_KEY=your-api-key-here
+BRING_CUSTOMER_NUMBER=your-customer-number-here
+# Postal code where packages are shipped from (default: 0174)
+BRING_ORIGIN_POSTAL_CODE=0562
+```
 
 **Important**: Never commit `.env` to git.
+
+#### 2. `config.json` — Business configuration (checked into git)
+
+This file controls everything about what data is fetched and how it's analyzed:
+
+- **Destinations** — which countries and postal codes to check rates for
+- **Weight tiers** — which weight brackets to query from the API
+- **Shipping services** — domestic and international service definitions
+- **Analysis settings** — VAT rate, zone strategy, Shopify bracket definitions, country groupings
+
+Edit `config.json` to customize for your needs. For example, to add a new destination country, add an entry to the `destinations` array. To change the Shopify weight brackets, edit the `analysis.domesticShopifyBrackets` array.
 
 ## Usage
 
@@ -91,14 +115,13 @@ npm run fetch:invoices    # Fetch invoices and PDFs
 npm run analyze           # Generate recommendations
 ```
 
+When run individually, scripts still write to CSV files. The database is only populated when using the full pipeline (`npm start`).
+
 ### Script Details
 
 #### fetch_rates.mjs
 
-Fetches shipping rates for:
-- **Norway**: 7 zones across the country, 5 domestic services
-- **International**: Sweden, Denmark, Finland, Iceland, Greenland, Faroe Islands
-- **Weight tiers**: 250g, 750g, 1kg, 5kg, 10kg, 20kg, 35kg (filtered per service max weight)
+Fetches shipping rates for all destinations and services defined in `config.json`.
 
 Output: `data/<timestamp>_<customer>/shipping_rates.csv`
 
@@ -120,8 +143,37 @@ Analyzes the fetched data and generates:
 - Summary of your actual shipping costs from invoices
 - Norway zone pricing breakdown across all weight tiers
 - Road toll average derived from invoice data
+- Profitability analysis cross-referencing invoice costs vs. suggested rates
 
 Output: `data/<timestamp>_<customer>/RESULTS.md`
+
+## Database
+
+All run data is stored in a SQLite database at `data/bring.db`. This enables:
+
+- **Historical comparison** — compare rates across different dates
+- **Querying** — use any SQLite tool to explore your data
+- **Future web UI** — the database is designed to support a visual interface
+
+The database contains these tables:
+
+| Table | Purpose |
+|-------|---------|
+| `runs` | Run metadata (date, config snapshot, status) |
+| `shipping_rates` | All fetched shipping rates per run |
+| `zones` | Postal code to zone mappings per run |
+| `invoice_line_items` | Invoice line items per run |
+| `analysis_results` | Generated RESULTS.md content per run |
+
+You can query it directly:
+
+```bash
+# List all runs
+sqlite3 data/bring.db "SELECT id, created_at, status FROM runs"
+
+# Compare rates between runs
+sqlite3 data/bring.db "SELECT run_id, country, weight_g, price_nok FROM shipping_rates WHERE service_id='3584' AND zone='3'"
+```
 
 ## Bring Services
 
