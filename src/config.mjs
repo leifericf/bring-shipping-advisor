@@ -2,24 +2,27 @@ import fs from 'fs';
 import { join } from 'path';
 import { ROOT_DIR } from './lib.mjs';
 
-const CONFIG_PATH = join(ROOT_DIR, 'config.json');
+export const DEFAULT_CONFIG_PATH = join(ROOT_DIR, 'config.json');
 
 /**
- * Load and validate config.json.
- * Returns the parsed configuration object.
+ * Load and validate config.
+ * Checks CONFIG_PATH env var first (for server-spawned per-account runs),
+ * then falls back to the default config.json in the project root.
  */
 export function loadConfig() {
-  if (!fs.existsSync(CONFIG_PATH)) {
-    console.error('Error: config.json not found in project root.');
+  const configPath = process.env.CONFIG_PATH || DEFAULT_CONFIG_PATH;
+
+  if (!fs.existsSync(configPath)) {
+    console.error(`Error: Config file not found at ${configPath}`);
     console.error('This file contains destination, service, and weight configuration.');
     process.exit(1);
   }
 
   let raw;
   try {
-    raw = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'));
+    raw = JSON.parse(fs.readFileSync(configPath, 'utf8'));
   } catch (err) {
-    console.error(`Error: config.json is not valid JSON: ${err.message}`);
+    console.error(`Error: Config file is not valid JSON: ${err.message}`);
     process.exit(1);
   }
 
