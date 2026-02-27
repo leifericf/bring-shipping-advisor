@@ -1,4 +1,4 @@
-# Bring Shipping Rates
+# Bring Shipping Analyzer
 
 Tools to fetch and analyze shipping rates from Bring (Posten) for Shopify stores.
 
@@ -9,7 +9,7 @@ This project fetches shipping rates and invoice data from the Bring API to help 
 ## Project Structure
 
 ```
-bring-shipping-rates/
+bring-shipping-analyzer/
 ├── README.md               # This file
 ├── package.json            # Project metadata and npm scripts
 ├── config.json             # Default business configuration (destinations, services, weights)

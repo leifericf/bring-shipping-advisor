@@ -215,7 +215,7 @@ app.get('/api/runs/:id/status', (req, res) => {
 getDb();
 
 app.listen(PORT, () => {
-  console.log(`\nBring Shipping Rates — Web UI`);
+  console.log(`\nBring Shipping Analyzer — Web UI`);
   console.log(`Running at http://localhost:${PORT}\n`);
 });
 

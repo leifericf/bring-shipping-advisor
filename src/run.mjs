@@ -28,7 +28,7 @@ const scripts = [
   { name: 'analyze.mjs', desc: 'Analyzing data', status: 'analyzing' },
 ];
 
-console.log('Bring Shipping Rates - Full Pipeline\n');
+console.log('Bring Shipping Analyzer - Full Pipeline\n');
 console.log('='.repeat(50) + '\n');
 console.log(`Output directory: ${OUTPUT_DIR}`);
 console.log(`Run ID: ${runId}\n`);
