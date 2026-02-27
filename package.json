@@ -7,8 +7,7 @@
     "node": ">=18"
   },
   "scripts": {
-    "start": "node src/run.mjs",
-    "server": "node src/server.mjs"
+    "start": "node src/server.mjs"
   },
   "dependencies": {
     "better-sqlite3": "^12.6.2",
