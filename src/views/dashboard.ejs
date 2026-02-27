@@ -18,7 +18,7 @@
             Origin: <code><%= account.origin_postal_code %></code>
           </p>
           <footer>
-            <div class="inline-actions">
+            <div class="actions">
               <a href="/accounts/<%= account.id %>/runs" role="button" class="outline">Runs</a>
               <a href="/accounts/<%= account.id %>/config" role="button" class="outline secondary">Config</a>
               <a href="/accounts/<%= account.id %>/edit" role="button" class="outline secondary">Edit</a>
@@ -39,29 +39,31 @@
   <% if (recentRuns.length === 0) { %>
     <p>No runs yet.</p>
   <% } else { %>
-    <table>
-      <thead>
-        <tr>
-          <th>Run</th>
-          <th>Account</th>
-          <th>Customer</th>
-          <th>Date</th>
-          <th>Status</th>
-          <th></th>
-        </tr>
-      </thead>
-      <tbody>
-        <% for (const run of recentRuns) { %>
+    <div class="table-wrap">
+      <table>
+        <thead>
           <tr>
-            <td>#<%= run.id %></td>
-            <td><%= run.account_name || '(CLI)' %></td>
-            <td><code><%= run.customer_number %></code></td>
-            <td><%= run.created_at %></td>
-            <td><span class="status status-<%= run.status %>"><%= run.status %></span></td>
-            <td><a href="/runs/<%= run.id %>">View</a></td>
+            <th>Run</th>
+            <th>Account</th>
+            <th>Customer</th>
+            <th>Date</th>
+            <th>Status</th>
+            <th></th>
           </tr>
-        <% } %>
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          <% for (const run of recentRuns) { %>
+            <tr>
+              <td>#<%= run.id %></td>
+              <td><%= run.account_name || '(CLI)' %></td>
+              <td><code><%= run.customer_number %></code></td>
+              <td><%= run.created_at %></td>
+              <td><span class="status status-<%= run.status %>"><%= run.status %></span></td>
+              <td><a href="/runs/<%= run.id %>">View</a></td>
+            </tr>
+          <% } %>
+        </tbody>
+      </table>
+    </div>
   <% } %>
 </section>

@@ -3,7 +3,7 @@
   <p>Customer <code><%= account.customer_number %></code> &middot; Origin <code><%= account.origin_postal_code %></code></p>
 </hgroup>
 
-<div class="inline-actions" style="margin-bottom: 1.5rem;">
+<div class="actions mb-1">
   <form method="POST" action="/accounts/<%= account.id %>/runs">
     <button type="submit">Start New Run</button>
   </form>
@@ -16,24 +16,26 @@
 <% if (runs.length === 0) { %>
   <p>No runs yet. Click "Start New Run" to fetch rates and invoices.</p>
 <% } else { %>
-  <table>
-    <thead>
-      <tr>
-        <th>Run</th>
-        <th>Date</th>
-        <th>Status</th>
-        <th></th>
-      </tr>
-    </thead>
-    <tbody>
-      <% for (const run of runs) { %>
+  <div class="table-wrap">
+    <table>
+      <thead>
         <tr>
-          <td>#<%= run.id %></td>
-          <td><%= run.created_at %></td>
-          <td><span class="status status-<%= run.status %>"><%= run.status %></span></td>
-          <td><a href="/runs/<%= run.id %>">View</a></td>
+          <th>Run</th>
+          <th>Date</th>
+          <th>Status</th>
+          <th></th>
         </tr>
-      <% } %>
-    </tbody>
-  </table>
+      </thead>
+      <tbody>
+        <% for (const run of runs) { %>
+          <tr>
+            <td>#<%= run.id %></td>
+            <td><%= run.created_at %></td>
+            <td><span class="status status-<%= run.status %>"><%= run.status %></span></td>
+            <td><a href="/runs/<%= run.id %>">View</a></td>
+          </tr>
+        <% } %>
+      </tbody>
+    </table>
+  </div>
 <% } %>

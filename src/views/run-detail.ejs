@@ -12,7 +12,7 @@
 </p>
 
 <% if (run.status !== 'completed' && run.status !== 'failed') { %>
-  <article id="progress-box" aria-busy="true">
+  <article class="run-progress" id="progress-box" aria-busy="true">
     Pipeline is running... This page will update automatically.
   </article>
 
@@ -26,7 +26,6 @@
           document.getElementById('run-status').className = 'status status-' + data.status;
 
           if (data.status === 'completed' || data.status === 'failed') {
-            // Reload to show results
             window.location.reload();
           } else {
             document.getElementById('progress-box').innerHTML =
@@ -42,7 +41,7 @@
 <% } %>
 
 <% if (run.status === 'failed') { %>
-  <article style="border-color: #dc3545;">
+  <article class="run-failed">
     The pipeline failed. Check the server console for details.
   </article>
 <% } %>
@@ -53,12 +52,12 @@
   </section>
 <% } %>
 
-<div class="inline-actions" style="margin-top: 2rem;">
+<div class="actions mt-2">
   <% if (run.account_id) { %>
     <a href="/accounts/<%= run.account_id %>/runs" role="button" class="outline secondary">Back to Runs</a>
   <% } %>
   <a href="/" role="button" class="outline secondary">Dashboard</a>
   <% if (run.output_dir) { %>
-    <small style="margin-left: auto; color: var(--pico-muted-color);">Output: <code><%= run.output_dir %></code></small>
+    <small class="push-right run-output-path">Output: <code><%= run.output_dir %></code></small>
   <% } %>
 </div>

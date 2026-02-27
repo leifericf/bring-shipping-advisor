@@ -1,17 +1,42 @@
-/* Minimal overrides — Pico CSS handles most styling */
+/* ---------------------------------------------------------------------------
+   Bring Shipping Rates — UI overrides for Pico CSS
+   --------------------------------------------------------------------------- */
 
-/* Tighter table spacing */
-table td, table th {
-  padding: 0.4rem 0.6rem;
+/* -- Layout ---------------------------------------------------------------- */
+
+/* Reduce Pico's generous default spacing between sections */
+main.container > section + section {
+  margin-top: 2rem;
 }
 
-/* Status badges */
+/* Footer breathing room */
+body > footer {
+  margin-top: 3rem;
+  padding: 1.5rem 0;
+  border-top: 1px solid var(--pico-muted-border-color);
+}
+
+/* -- Flash messages -------------------------------------------------------- */
+
+.flash {
+  padding: 0.75rem 1rem;
+  margin-bottom: 1.5rem;
+  border-radius: var(--pico-border-radius);
+  background: #fff3cd;
+  color: #664d03;
+  border: 1px solid #ffecb5;
+}
+
+/* -- Status badges --------------------------------------------------------- */
+
 .status {
   display: inline-block;
-  padding: 0.15rem 0.5rem;
+  padding: 0.2rem 0.6rem;
   border-radius: 4px;
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   font-weight: 600;
+  white-space: nowrap;
+  line-height: 1.4;
 }
 .status-completed { background: #d4edda; color: #155724; }
 .status-failed { background: #f8d7da; color: #721c24; }
@@ -20,36 +45,198 @@ table td, table th {
 .status-fetching_invoices,
 .status-analyzing { background: #fff3cd; color: #856404; }
 
-/* Config editor */
-.config-editor {
-  font-family: monospace;
-  font-size: 0.85rem;
-  min-height: 500px;
-  width: 100%;
-  tab-size: 2;
+/* -- Action bars (horizontal button rows) ---------------------------------- */
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
 }
 
-/* Rendered markdown results */
-.results-content h1 { font-size: 1.6rem; }
-.results-content h2 { font-size: 1.3rem; margin-top: 2rem; }
-.results-content h3 { font-size: 1.1rem; margin-top: 1.5rem; }
+/* Reset Pico's default bottom margin on elements inside action bars */
+.actions form,
+.actions button,
+.actions [role="button"],
+.actions p,
+.actions small {
+  margin-bottom: 0;
+}
 
-/* Account cards grid */
+/* Push an element to the far right */
+.actions .push-right {
+  margin-left: auto;
+}
+
+/* -- Account cards --------------------------------------------------------- */
+
 .account-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 1rem;
 }
+
 .account-grid article {
   margin-bottom: 0;
 }
 
-/* Inline form buttons */
-.inline-actions {
+/* Pico article header/footer get background colors — keep them but tighten */
+.account-grid article > header {
+  padding: 0.75rem 1rem;
+}
+.account-grid article > footer {
+  padding: 0.75rem 1rem;
+}
+
+/* Card body text */
+.account-grid article > p {
+  padding: 0 1rem;
+  margin: 0.5rem 0;
+  font-size: 0.9rem;
+}
+
+/* Ensure card action buttons don't overflow */
+.account-grid .actions [role="button"] {
+  font-size: 0.85rem;
+  padding: 0.3rem 0.7rem;
+}
+
+/* -- Tables ---------------------------------------------------------------- */
+
+/* Tighter cell padding than Pico's default */
+table td, table th {
+  padding: 0.5rem 0.75rem;
+  vertical-align: middle;
+}
+
+/* Prevent wide tables from breaking the layout */
+.table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* -- Forms ----------------------------------------------------------------- */
+
+/* Fieldset legend — Pico doesn't style these well */
+fieldset {
+  margin-bottom: 1rem;
+}
+
+fieldset legend {
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+/* Form footer with actions */
+.form-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.5rem;
   align-items: center;
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--pico-muted-border-color);
 }
-.inline-actions form {
-  margin: 0;
+
+.form-actions button,
+.form-actions [role="button"] {
+  margin-bottom: 0;
 }
+
+/* Danger button style */
+.btn-danger {
+  --pico-color: #dc3545;
+  --pico-border-color: #dc3545;
+}
+.btn-danger:hover {
+  --pico-color: #fff;
+  --pico-background-color: #dc3545;
+  --pico-border-color: #dc3545;
+}
+
+/* -- Config editor --------------------------------------------------------- */
+
+.config-editor {
+  font-family: ui-monospace, "SF Mono", "Cascadia Code", "Segoe UI Mono", Consolas, monospace;
+  font-size: 0.85rem;
+  min-height: 500px;
+  width: 100%;
+  tab-size: 2;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.config-error {
+  color: #dc3545;
+  font-size: 0.9rem;
+  margin-top: 0.5rem;
+  display: none;
+}
+
+/* -- Run detail ------------------------------------------------------------ */
+
+/* Progress box */
+.run-progress {
+  padding: 1rem 1.25rem;
+}
+
+/* Failed state */
+.run-failed {
+  border-left: 4px solid #dc3545;
+}
+
+/* Output directory path */
+.run-output-path {
+  color: var(--pico-muted-color);
+  font-size: 0.85rem;
+}
+
+/* -- Results (rendered markdown) ------------------------------------------- */
+
+.results-content {
+  margin-top: 2rem;
+}
+
+.results-content h1 {
+  font-size: 1.5rem;
+  margin-top: 2rem;
+  padding-bottom: 0.3rem;
+  border-bottom: 1px solid var(--pico-muted-border-color);
+}
+
+.results-content h2 {
+  font-size: 1.25rem;
+  margin-top: 2.5rem;
+  padding-bottom: 0.2rem;
+  border-bottom: 1px solid var(--pico-muted-border-color);
+}
+
+.results-content h3 {
+  font-size: 1.05rem;
+  margin-top: 1.5rem;
+}
+
+/* Results tables need horizontal scroll on narrow screens */
+.results-content table {
+  display: block;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  white-space: nowrap;
+}
+
+.results-content table th,
+.results-content table td {
+  font-size: 0.85rem;
+}
+
+/* Code in results */
+.results-content code {
+  font-size: 0.85em;
+}
+
+/* -- Spacing utilities ----------------------------------------------------- */
+
+.mt-0 { margin-top: 0; }
+.mt-2 { margin-top: 2rem; }
+.mb-1 { margin-bottom: 1.5rem; }
+.bt-0 { border-top: none; padding-top: 0; }
