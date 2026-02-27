@@ -164,7 +164,9 @@ function generateProfitabilitySection(lineItems, rates, roadToll) {
   for (const bracket of brackets) {
     const n = bracket.shipments.length;
     if (n === 0) {
-      md += `| ${bracket.name} | 0 | — | ${bracket.shopifyPrice} kr | ${bracket.revenueExVat.toFixed(2)} NOK | — | — |\n`;
+      const priceStr = bracket.shopifyPrice != null ? `${bracket.shopifyPrice} kr` : 'N/A';
+      const revStr = bracket.revenueExVat != null ? `${bracket.revenueExVat.toFixed(2)} NOK` : 'N/A';
+      md += `| ${bracket.name} | 0 | — | ${priceStr} | ${revStr} | — | — |\n`;
       continue;
     }
 
@@ -490,15 +492,17 @@ async function main() {
     console.log(`Reading data from database (run ${RUN_ID})...`);
     rates = getShippingRates(RUN_ID).map(r => ({
       ...r,
+      // Normalize zone: DB may store as "1.0" (float text), CSV uses "1"
+      zone: r.zone != null ? String(r.zone).replace(/\.0$/, '') : '',
       weight_g: String(r.weight_g),
       price_nok: String(r.price_nok),
     }));
     lineItems = getInvoiceLineItems(RUN_ID).map(r => ({
       ...r,
       weight_kg: r.weight_kg != null ? String(r.weight_kg) : '',
-      agreement_price: String(r.agreement_price),
-      gross_price: String(r.gross_price),
-      discount: String(r.discount),
+      agreement_price: String(r.agreement_price ?? 0),
+      gross_price: String(r.gross_price ?? 0),
+      discount: String(r.discount ?? 0),
     }));
     console.log(`Loaded ${rates.length} shipping rates from DB`);
     console.log(`Loaded ${lineItems.length} invoice line items from DB\n`);

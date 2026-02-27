@@ -135,7 +135,7 @@ export function insertShippingRates(runId, rates) {
   `);
   const insertMany = db.transaction((rows) => {
     for (const r of rows) {
-      stmt.run(runId, r.country, r.country_code, r.postal_code, r.zone, r.service_id, r.service_name, r.weight_g, r.price_nok);
+      stmt.run(runId, r.country, r.country_code, r.postal_code, r.zone != null ? String(r.zone) : null, r.service_id, r.service_name, r.weight_g, r.price_nok);
     }
   });
   insertMany(rates);
@@ -149,7 +149,7 @@ export function insertZones(runId, zones) {
   `);
   const insertMany = db.transaction((rows) => {
     for (const z of rows) {
-      stmt.run(runId, z.country_code, z.postal_code, z.service_id, z.zone);
+      stmt.run(runId, z.country_code, z.postal_code, z.service_id, z.zone != null ? String(z.zone) : null);
     }
   });
   insertMany(zones);
