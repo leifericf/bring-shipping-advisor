@@ -61,7 +61,6 @@ function initSchema() {
       account_id         INTEGER REFERENCES accounts(id),
       customer_number    TEXT NOT NULL,
       origin_postal_code TEXT NOT NULL,
-      output_dir         TEXT,
       config_snapshot    TEXT NOT NULL,
       status             TEXT NOT NULL DEFAULT 'pending'
     );
