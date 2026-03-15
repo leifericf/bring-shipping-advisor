@@ -82,7 +82,7 @@
 <% if (run.status === 'completed') { %>
   <div class="actions mb-1">
     <% if (invoiceCount > 0) { %>
-      <a href="/runs/<%= run.id %>/invoices" role="button" class="outline">Invoices (<%= invoiceCount %>)</a>
+      <a href="/runs/<%= run.id %>/invoices">Invoices (<%= invoiceCount %>)</a>
     <% } %>
   </div>
 <% } %>
