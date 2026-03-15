@@ -43,6 +43,12 @@ function initSchema() {
     _db.exec('ALTER TABLE runs ADD COLUMN account_id INTEGER REFERENCES accounts(id)');
   }
 
+  // Migrate: rename results_markdown to results_html (for existing DBs)
+  const analysisColumns = _db.prepare("PRAGMA table_info(analysis_results)").all();
+  if (analysisColumns.length > 0 && analysisColumns.find(c => c.name === 'results_markdown')) {
+    _db.exec('ALTER TABLE analysis_results RENAME COLUMN results_markdown TO results_html');
+  }
+
   _db.exec(`
     CREATE TABLE IF NOT EXISTS accounts (
       id                 INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -121,7 +127,7 @@ function initSchema() {
     CREATE TABLE IF NOT EXISTS analysis_results (
       id               INTEGER PRIMARY KEY AUTOINCREMENT,
       run_id           INTEGER NOT NULL REFERENCES runs(id),
-      results_markdown TEXT NOT NULL,
+      results_html     TEXT NOT NULL,
       created_at       TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
@@ -318,14 +324,14 @@ export function insertInvoiceLineItems(runId, lineItems) {
 // Analysis helpers
 // ---------------------------------------------------------------------------
 
-export function insertAnalysisResult(runId, markdown) {
+export function insertAnalysisResult(runId, html) {
   const db = getDb();
-  db.prepare('INSERT INTO analysis_results (run_id, results_markdown) VALUES (?, ?)').run(runId, markdown);
+  db.prepare('INSERT INTO analysis_results (run_id, results_html) VALUES (?, ?)').run(runId, html);
 }
 
 export function getAnalysisResult(runId) {
   const db = getDb();
-  return db.prepare('SELECT results_markdown FROM analysis_results WHERE run_id = ? ORDER BY created_at DESC LIMIT 1').get(runId);
+  return db.prepare('SELECT results_html FROM analysis_results WHERE run_id = ? ORDER BY created_at DESC LIMIT 1').get(runId);
 }
 
 /**

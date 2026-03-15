@@ -4,8 +4,6 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { spawn } from 'child_process';
 import { tmpdir } from 'os';
-import { marked } from 'marked';
-
 import { httpsGet } from './lib.mjs';
 import { DEFAULT_CONFIG_PATH } from './config.mjs';
 import {
@@ -202,11 +200,7 @@ app.get('/runs/:id', (req, res) => {
   let resultsHtml = null;
   if (run.status === 'completed') {
     const result = getAnalysisResult(run.id);
-    if (result) {
-      const content = result.results_markdown;
-      // New reports store HTML directly; legacy reports store markdown
-      resultsHtml = content.trimStart().startsWith('<') ? content : marked(content);
-    }
+    if (result) resultsHtml = result.results_html;
   }
 
   // Check if this run has invoices

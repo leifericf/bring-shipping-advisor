@@ -952,7 +952,6 @@ async function main() {
   const invoiceAnalysis = analyzeInvoices(lineItems);
   const { html, cli } = generateReport(rates, invoiceAnalysis, lineItems);
 
-  // Store HTML in database (column name is results_markdown for compat, content is now HTML)
   insertAnalysisResult(RUN_ID, html);
   closeDb();
 
