@@ -720,6 +720,14 @@ details summary:hover {
   letter-spacing: 0.04em;
 }
 
+.kpi-note {
+  display: block;
+  font-size: 0.65rem;
+  color: var(--pico-muted-color);
+  margin-top: 0.15rem;
+  font-style: italic;
+}
+
 .kpi-positive .kpi-value { color: #155724; }
 .kpi-negative .kpi-value { color: #721c24; }
 

@@ -165,8 +165,14 @@ function computeProfitability(lineItems, rates, roadToll) {
     }
   }
 
+  const skipped = { noWeight: 0, noMatchingBracket: 0, total: 0, byReason: {} };
+
   for (const [, s] of shipments) {
-    if (s.weight === null) continue;
+    if (s.weight === null) {
+      skipped.noWeight++;
+      skipped.total++;
+      continue;
+    }
     const bracket = brackets.find(b => s.productCode === b.serviceId && s.weight <= b.maxWeight);
     if (bracket) {
       bracket.shipments.push({
@@ -177,6 +183,20 @@ function computeProfitability(lineItems, rates, roadToll) {
         revenueExVat: bracket.revenueExVat,
         margin: bracket.revenueExVat - s.totalCost,
       });
+    } else {
+      skipped.noMatchingBracket++;
+      skipped.total++;
+      const configuredIds = new Set(brackets.map(b => b.serviceId));
+      if (!configuredIds.has(s.productCode)) {
+        const key = `Service ${s.productCode} not in configured brackets`;
+        skipped.byReason[key] = (skipped.byReason[key] || 0) + 1;
+      } else if (s.weight > Math.max(...brackets.filter(b => b.serviceId === s.productCode).map(b => b.maxWeight))) {
+        const key = `Weight ${s.weight} kg exceeds max bracket`;
+        skipped.byReason[key] = (skipped.byReason[key] || 0) + 1;
+      } else {
+        const key = `Service ${s.productCode}, ${s.weight} kg — no bracket match`;
+        skipped.byReason[key] = (skipped.byReason[key] || 0) + 1;
+      }
     }
   }
 
@@ -218,6 +238,7 @@ function computeProfitability(lineItems, rates, roadToll) {
     avgMarginAll,
     marginPct,
     lossMaking,
+    skipped,
   };
 }
 
@@ -450,7 +471,14 @@ function generateReport(rates, invoiceAnalysis, lineItems) {
     const sign = profitability.avgMarginAll >= 0 ? '+' : '';
     cli += `\n  Profitability: ${profitability.totalShipments} shipments, `;
     cli += `avg margin ${sign}${fmtNok(profitability.avgMarginAll)}/parcel, `;
-    cli += `${profitability.lossMaking.length} loss-making.\n`;
+    cli += `${profitability.lossMaking.length} loss-making.`;
+    if (profitability.skipped.total > 0) {
+      cli += `\n  (${profitability.skipped.total} shipments excluded from profitability analysis:`;
+      if (profitability.skipped.noWeight > 0) cli += ` ${profitability.skipped.noWeight} missing weight,`;
+      if (profitability.skipped.noMatchingBracket > 0) cli += ` ${profitability.skipped.noMatchingBracket} no matching bracket,`;
+      cli = cli.replace(/,$/, '') + ')';
+    }
+    cli += '\n';
   }
 
   cli += '\n  Open the web UI for the full report with drill-down details.\n';
@@ -585,6 +613,14 @@ function renderKpis(prof, roadToll, sortedProducts) {
   h += `</div>`;
 
   h += `<div class="kpi">`;
+  h += `<span class="kpi-value">${prof.totalShipments}</span>`;
+  h += `<span class="kpi-label">Matched to brackets</span>`;
+  if (prof.skipped.total > 0) {
+    h += `<span class="kpi-note">${prof.skipped.total} excluded</span>`;
+  }
+  h += `</div>`;
+
+  h += `<div class="kpi">`;
   h += `<span class="kpi-value">${roadToll.toFixed(2)} kr</span>`;
   h += `<span class="kpi-label">Avg road toll</span>`;
   h += `</div>`;
@@ -699,9 +735,22 @@ function renderProfitabilityDetails(prof, safeZone, primaryService) {
   h += `<summary>Profitability analysis &mdash; ${prof.totalShipments} shipments</summary>`;
   h += `<div class="report-details-body">`;
 
-  h += `<p>Based on ${prof.totalShipments} domestic shipments from invoice data, `;
+  h += `<p>Based on ${prof.totalShipments} shipments from invoice data that matched a configured bracket, `;
   h += `projected against the recommended customer rates (Zone ${esc(safeZone)} pricing). `;
   h += `Brackets with 0 shipments have no historical data yet.</p>`;
+
+  if (prof.skipped.total > 0) {
+    h += `<p class="report-note"><strong>${prof.skipped.total} shipments excluded</strong> from this analysis: `;
+    const parts = [];
+    if (prof.skipped.noWeight > 0) parts.push(`${prof.skipped.noWeight} missing weight data`);
+    if (prof.skipped.noMatchingBracket > 0) parts.push(`${prof.skipped.noMatchingBracket} no matching bracket`);
+    h += parts.join(', ') + '.';
+    const reasons = Object.entries(prof.skipped.byReason).sort((a, b) => b[1] - a[1]);
+    if (reasons.length > 0) {
+      h += '<br>Breakdown: ' + reasons.map(([reason, count]) => `${reason} (${count})`).join(', ') + '.';
+    }
+    h += `</p>`;
+  }
 
   // Per-bracket summary
   h += `<h4>Per-bracket summary</h4>`;
