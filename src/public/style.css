@@ -87,11 +87,17 @@ header.container nav a.nav-cta {
   text-transform: capitalize;
 }
 .status-completed { background: #d4edda; color: #155724; }
+.status-completed::before { content: "\2713\00a0"; /* checkmark */ }
 .status-failed    { background: #f8d7da; color: #721c24; }
+.status-failed::before { content: "\2717\00a0"; /* cross */ }
 .status-pending,
 .status-fetching_rates,
 .status-fetching_invoices,
 .status-analyzing { background: #fff3cd; color: #856404; }
+.status-pending::before,
+.status-fetching_rates::before,
+.status-fetching_invoices::before,
+.status-analyzing::before { content: "\25CB\00a0"; /* circle */ }
 
 /* -- Action bars (horizontal button rows) ---------------------------------- */
 
