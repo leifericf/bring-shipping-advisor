@@ -966,4 +966,4 @@ async function main() {
   console.log(cli);
 }
 
-main().catch(console.error);
+main().catch(err => { console.error(err); process.exit(1); });

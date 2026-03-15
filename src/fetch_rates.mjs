@@ -164,4 +164,4 @@ async function main() {
   console.log(`\n\nDone! Fetched ${results.length} rates.`);
 }
 
-main().catch(console.error);
+main().catch(err => { console.error(err); process.exit(1); });

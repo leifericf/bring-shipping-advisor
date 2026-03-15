@@ -178,4 +178,4 @@ async function main() {
   console.log(`Saved ${invoices.length} invoices and ${allLineItems.length} line items to database.`);
 }
 
-main().catch(console.error);
+main().catch(err => { console.error(err); process.exit(1); });
