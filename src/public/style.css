@@ -303,14 +303,27 @@ details summary:hover {
   font-size: 0.9rem;
 }
 
-#dest-table code {
-  font-size: 0.85em;
+/* Region group details inside destinations */
+#dest-groups details {
+  margin-bottom: 0;
+  border-bottom: 1px solid var(--pico-muted-border-color);
 }
 
-#dest-table .dest-count {
-  color: var(--pico-muted-color);
-  font-size: 0.85rem;
-  font-weight: normal;
+#dest-groups details:last-child {
+  border-bottom: none;
+}
+
+#dest-groups details summary {
+  padding: 0.6rem 0;
+  font-size: 0.95rem;
+}
+
+#dest-groups table {
+  margin-bottom: 0;
+}
+
+#dest-groups code {
+  font-size: 0.85em;
 }
 
 .dest-remove-btn {

@@ -19,22 +19,8 @@
     <h2>Destinations <span id="dest-count" class="dest-count"></span></h2>
     <p>Add or remove shipping destinations. Each destination needs a country name, ISO country code, and postal code.</p>
 
-    <div class="table-wrap">
-      <table id="dest-table">
-        <thead>
-          <tr>
-            <th>Country</th>
-            <th>Code</th>
-            <th>Postal Code</th>
-            <th>Zone</th>
-            <th>Description</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody id="dest-tbody">
-          <!-- filled by JS -->
-        </tbody>
-      </table>
+    <div id="dest-groups">
+      <!-- filled by JS: one <details> per region -->
     </div>
 
     <!-- Add single destination -->
@@ -179,8 +165,8 @@ async function loadCountries() {
   }
 }
 
-// Fire on page load
-loadCountries();
+// Fire on page load — re-render destinations once we have region data
+loadCountries().then(() => renderDestinations());
 
 // ---------------------------------------------------------------------------
 // State helpers
@@ -197,8 +183,14 @@ function setConfig(config) {
 }
 
 // ---------------------------------------------------------------------------
-// Render destinations table
+// Render destinations grouped by region
 // ---------------------------------------------------------------------------
+
+// Look up the subregion for a country code using the API data
+function getSubregion(code) {
+  const c = allCountries.find(x => x.code === code);
+  return c ? c.subregion : '';
+}
 
 function renderDestinations() {
   const config = getConfig();
@@ -208,23 +200,82 @@ function renderDestinations() {
   const countEl = document.getElementById('dest-count');
   if (countEl) countEl.textContent = '(' + config.destinations.length + ')';
 
-  const tbody = document.getElementById('dest-tbody');
-  tbody.innerHTML = '';
+  const container = document.getElementById('dest-groups');
 
+  // Remember which details are currently open so we can preserve state
+  const openRegions = new Set();
+  container.querySelectorAll('details[open]').forEach(d => {
+    openRegions.add(d.dataset.region);
+  });
+
+  container.innerHTML = '';
+
+  // Group destinations by region, keeping original array index for remove
+  const originCountry = config.originCountry || '';
+  const groups = {};
   config.destinations.forEach((d, i) => {
-    const tr = document.createElement('tr');
-    tr.innerHTML =
-      '<td>' + esc(d.country) + '</td>' +
-      '<td><code>' + esc(d.code) + '</code></td>' +
-      '<td>' + esc(d.postalCode) + '</td>' +
-      '<td>' + (d.zone != null ? esc(String(d.zone)) : '<span class="muted">\u2014</span>') + '</td>' +
-      '<td>' + (d.desc ? esc(d.desc) : '') + '</td>' +
-      '<td><button type="button" class="outline secondary dest-remove-btn" data-index="' + i + '">Remove</button></td>';
-    tbody.appendChild(tr);
+    let region;
+    if (d.code === originCountry) {
+      region = 'Domestic';
+    } else if (allCountries.length > 0) {
+      region = getSubregion(d.code) || 'Other';
+    } else {
+      region = 'All destinations';
+    }
+    if (!groups[region]) groups[region] = [];
+    groups[region].push({ dest: d, index: i });
+  });
+
+  // Sort region names: Domestic first, then alphabetical, "Other" last
+  const regionNames = Object.keys(groups).sort((a, b) => {
+    if (a === 'Domestic') return -1;
+    if (b === 'Domestic') return 1;
+    if (a === 'Other') return 1;
+    if (b === 'Other') return -1;
+    if (a === 'All destinations') return 0;
+    return a.localeCompare(b);
+  });
+
+  regionNames.forEach(region => {
+    const items = groups[region];
+    const details = document.createElement('details');
+    details.dataset.region = region;
+    // Open by default on first render, or preserve previous open state
+    details.open = openRegions.size === 0 || openRegions.has(region);
+
+    const summary = document.createElement('summary');
+    summary.innerHTML = esc(region) + ' <span class="dest-count">(' + items.length + ')</span>';
+    details.appendChild(summary);
+
+    const wrap = document.createElement('div');
+    wrap.className = 'table-wrap';
+
+    const table = document.createElement('table');
+    table.innerHTML =
+      '<thead><tr>' +
+      '<th>Country</th><th>Code</th><th>Postal Code</th><th>Zone</th><th>Description</th><th></th>' +
+      '</tr></thead>';
+
+    const tbody = document.createElement('tbody');
+    items.forEach(({ dest: d, index: i }) => {
+      const tr = document.createElement('tr');
+      tr.innerHTML =
+        '<td>' + esc(d.country) + '</td>' +
+        '<td><code>' + esc(d.code) + '</code></td>' +
+        '<td>' + esc(d.postalCode) + '</td>' +
+        '<td>' + (d.zone != null ? esc(String(d.zone)) : '<span class="muted">\u2014</span>') + '</td>' +
+        '<td>' + (d.desc ? esc(d.desc) : '') + '</td>' +
+        '<td><button type="button" class="outline secondary dest-remove-btn" data-index="' + i + '">Remove</button></td>';
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    wrap.appendChild(table);
+    details.appendChild(wrap);
+    container.appendChild(details);
   });
 
   // Bind remove buttons
-  tbody.querySelectorAll('.dest-remove-btn').forEach(btn => {
+  container.querySelectorAll('.dest-remove-btn').forEach(btn => {
     btn.addEventListener('click', function () {
       removeDest(Number(this.dataset.index));
     });
