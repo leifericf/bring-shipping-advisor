@@ -29,7 +29,7 @@ const scripts = [
   { name: 'analyze.mjs', desc: 'Analyzing data', status: 'analyzing' },
 ];
 
-console.log('Bring Shipping Analyzer - Full Pipeline\n');
+console.log('Bring Shipping Advisor - Full Pipeline\n');
 console.log('='.repeat(50) + '\n');
 console.log(`Run ID: ${RUN_ID}\n`);
 

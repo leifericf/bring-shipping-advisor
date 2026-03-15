@@ -275,7 +275,7 @@ app.get('/runs/:runId/invoices/:invoiceNumber/pdf', async (req, res) => {
 getDb();
 
 app.listen(PORT, () => {
-  console.log(`\nBring Shipping Analyzer — Web UI`);
+  console.log(`\nBring Shipping Advisor — Web UI`);
   console.log(`Running at http://localhost:${PORT}\n`);
 });
 

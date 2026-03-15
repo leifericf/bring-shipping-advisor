@@ -1,4 +1,4 @@
-# Bring Shipping Analyzer
+# Bring Shipping Advisor
 
 Figure out what to charge your customers for shipping.
 
