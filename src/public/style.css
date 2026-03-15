@@ -4,16 +4,51 @@
 
 /* -- Layout ---------------------------------------------------------------- */
 
-/* Reduce Pico's generous default spacing between sections */
 main.container > section + section {
   margin-top: 2rem;
 }
 
-/* Footer breathing room */
 body > footer {
   margin-top: 3rem;
   padding: 1.5rem 0;
   border-top: 1px solid var(--pico-muted-border-color);
+  text-align: center;
+}
+
+/* -- Nav ------------------------------------------------------------------- */
+
+header.container nav a {
+  transition: opacity 0.15s ease;
+}
+header.container nav a:hover {
+  opacity: 0.75;
+}
+
+/* -- Breadcrumbs ----------------------------------------------------------- */
+
+.breadcrumb {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  padding: 0;
+  margin: 0 0 1.5rem;
+  font-size: 0.9rem;
+}
+
+.breadcrumb li {
+  display: inline-flex;
+  align-items: center;
+}
+
+.breadcrumb li + li::before {
+  content: "/";
+  margin-right: 0.4rem;
+  color: var(--pico-muted-color);
+}
+
+.breadcrumb li:last-child {
+  color: var(--pico-muted-color);
 }
 
 /* -- Flash messages -------------------------------------------------------- */
@@ -31,15 +66,17 @@ body > footer {
 
 .status {
   display: inline-block;
-  padding: 0.2rem 0.6rem;
-  border-radius: 4px;
-  font-size: 0.8rem;
+  padding: 0.2rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
   font-weight: 600;
   white-space: nowrap;
-  line-height: 1.4;
+  line-height: 1.5;
+  letter-spacing: 0.02em;
+  text-transform: capitalize;
 }
 .status-completed { background: #d4edda; color: #155724; }
-.status-failed { background: #f8d7da; color: #721c24; }
+.status-failed    { background: #f8d7da; color: #721c24; }
 .status-pending,
 .status-fetching_rates,
 .status-fetching_invoices,
@@ -54,7 +91,6 @@ body > footer {
   align-items: center;
 }
 
-/* Reset Pico's default bottom margin on elements inside action bars */
 .actions form,
 .actions button,
 .actions [role="button"],
@@ -63,7 +99,6 @@ body > footer {
   margin-bottom: 0;
 }
 
-/* Push an element to the far right */
 .actions .push-right {
   margin-left: auto;
 }
@@ -78,46 +113,83 @@ body > footer {
 
 .account-grid article {
   margin-bottom: 0;
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
 }
 
-/* Pico article header/footer get background colors — keep them but tighten */
+.account-grid article:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  transform: translateY(-2px);
+}
+
 .account-grid article > header {
   padding: 0.75rem 1rem;
 }
+
 .account-grid article > footer {
   padding: 0.75rem 1rem;
 }
 
-/* Card body text */
 .account-grid article > p {
   padding: 0 1rem;
   margin: 0.5rem 0;
   font-size: 0.9rem;
 }
 
-/* Ensure card action buttons don't overflow */
 .account-grid .actions [role="button"] {
   font-size: 0.85rem;
   padding: 0.3rem 0.7rem;
 }
 
+/* -- Empty states ---------------------------------------------------------- */
+
+.empty-state {
+  text-align: center;
+  padding: 2.5rem 1rem;
+  color: var(--pico-muted-color);
+}
+
+.empty-state p {
+  margin-bottom: 0.5rem;
+}
+
+.empty-state .empty-icon {
+  font-size: 2rem;
+  margin-bottom: 0.5rem;
+  opacity: 0.4;
+}
+
 /* -- Tables ---------------------------------------------------------------- */
 
-/* Tighter cell padding than Pico's default */
 table td, table th {
   padding: 0.5rem 0.75rem;
   vertical-align: middle;
 }
 
-/* Prevent wide tables from breaking the layout */
+/* Zebra striping */
+table:not(.results-content table) tbody tr:nth-child(even) {
+  background: rgba(0, 0, 0, 0.02);
+}
+
+/* Row hover */
+table:not(.results-content table) tbody tr {
+  transition: background 0.12s ease;
+}
+table:not(.results-content table) tbody tr:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
 .table-wrap {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
 }
 
+/* Table links - make them look clickable */
+table a:not([role="button"]) {
+  font-weight: 500;
+}
+
 /* -- Forms ----------------------------------------------------------------- */
 
-/* Fieldset legend — Pico doesn't style these well */
 fieldset {
   margin-bottom: 1rem;
 }
@@ -127,7 +199,6 @@ fieldset legend {
   margin-bottom: 0.5rem;
 }
 
-/* Form footer with actions */
 .form-actions {
   display: flex;
   flex-wrap: wrap;
@@ -152,6 +223,52 @@ fieldset legend {
   --pico-color: #fff;
   --pico-background-color: #dc3545;
   --pico-border-color: #dc3545;
+}
+
+/* Danger zone section for destructive actions */
+.danger-zone {
+  margin-top: 3rem;
+  padding: 1.25rem;
+  border: 1px solid #f5c2c7;
+  border-radius: var(--pico-border-radius);
+  background: #fef2f2;
+}
+
+.danger-zone h3 {
+  font-size: 0.95rem;
+  color: #842029;
+  margin-bottom: 0.25rem;
+}
+
+.danger-zone p {
+  font-size: 0.85rem;
+  color: #842029;
+  margin-bottom: 0.75rem;
+  opacity: 0.8;
+}
+
+.danger-zone .form-actions {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+
+/* -- Details / Summary ----------------------------------------------------- */
+
+details {
+  margin-bottom: 0.5rem;
+}
+
+details summary {
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0.5rem 0;
+  transition: color 0.15s ease;
+  user-select: none;
+}
+
+details summary:hover {
+  color: var(--pico-primary);
 }
 
 /* -- Config editor --------------------------------------------------------- */
@@ -188,6 +305,12 @@ fieldset legend {
 
 #dest-table code {
   font-size: 0.85em;
+}
+
+#dest-table .dest-count {
+  color: var(--pico-muted-color);
+  font-size: 0.85rem;
+  font-weight: normal;
 }
 
 .dest-remove-btn {
@@ -262,7 +385,7 @@ fieldset legend {
   background: var(--pico-background-color, #fff);
   border: 1px solid var(--pico-muted-border-color);
   border-radius: var(--pico-border-radius);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
   max-height: 240px;
   overflow-y: auto;
 }
@@ -271,6 +394,7 @@ fieldset legend {
   padding: 0.5rem 0.75rem;
   cursor: pointer;
   font-size: 0.9rem;
+  transition: background 0.1s ease;
 }
 
 .autocomplete-list li:hover,
@@ -356,6 +480,36 @@ fieldset legend {
 
 /* -- Run detail ------------------------------------------------------------ */
 
+.run-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  padding: 1rem 1.25rem;
+  background: rgba(0, 0, 0, 0.02);
+  border-radius: var(--pico-border-radius);
+  border: 1px solid var(--pico-muted-border-color);
+}
+
+.run-meta-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.run-meta-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--pico-muted-color);
+  font-weight: 600;
+}
+
+.run-meta-value {
+  font-size: 0.95rem;
+}
+
 /* Progress box */
 .run-progress {
   padding: 1rem 1.25rem;
@@ -366,10 +520,16 @@ fieldset legend {
   border-left: 4px solid #dc3545;
 }
 
-/* Output directory path */
 .run-output-path {
   color: var(--pico-muted-color);
   font-size: 0.85rem;
+}
+
+/* -- Invoices -------------------------------------------------------------- */
+
+.invoice-download {
+  font-weight: 500;
+  white-space: nowrap;
 }
 
 /* -- Results (rendered markdown) ------------------------------------------- */
@@ -397,7 +557,6 @@ fieldset legend {
   margin-top: 1.5rem;
 }
 
-/* Results tables need horizontal scroll on narrow screens */
 .results-content table {
   display: block;
   overflow-x: auto;
@@ -410,7 +569,6 @@ fieldset legend {
   font-size: 0.85rem;
 }
 
-/* Code in results */
 .results-content code {
   font-size: 0.85em;
 }

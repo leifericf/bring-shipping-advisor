@@ -1,14 +1,26 @@
+<ul class="breadcrumb">
+  <li><a href="/">Dashboard</a></li>
+  <% if (run.account_id) { %>
+    <li><a href="/accounts/<%= run.account_id %>/runs"><%= run.account_name || 'Account' %></a></li>
+  <% } %>
+  <li><a href="/runs/<%= run.id %>">Run #<%= run.id %></a></li>
+  <li>Invoices</li>
+</ul>
+
 <hgroup>
   <h1>Invoices</h1>
   <p>
     Run #<%= run.id %>
     <% if (run.account_name) { %>&middot; <%= run.account_name %><% } %>
     &middot; Customer <code><%= run.customer_number %></code>
+    &middot; <%= invoices.length %> invoice<%= invoices.length !== 1 ? 's' : '' %>
   </p>
 </hgroup>
 
 <% if (invoices.length === 0) { %>
-  <p>No invoices found for this run.</p>
+  <div class="empty-state">
+    <p>No invoices found for this run.</p>
+  </div>
 <% } else { %>
   <div class="table-wrap">
     <table>
@@ -26,13 +38,13 @@
         <% for (const inv of invoices) { %>
           <tr>
             <td><code><%= inv.invoice_number %></code></td>
-            <td><%= inv.invoice_date %></td>
-            <td><%= inv.total_amount != null ? inv.total_amount.toFixed(2) : '—' %></td>
-            <td><%= inv.currency || '—' %></td>
+            <td><%= inv.invoice_date ? new Date(inv.invoice_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '\u2014' %></td>
+            <td><%= inv.total_amount != null ? inv.total_amount.toLocaleString('nb-NO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '\u2014' %></td>
+            <td><%= inv.currency || '\u2014' %></td>
             <td><%= inv.specification_available ? 'Yes' : 'No' %></td>
             <td>
               <% if (run.account_id) { %>
-                <a href="/runs/<%= run.id %>/invoices/<%= inv.invoice_number %>/pdf">Download PDF</a>
+                <a href="/runs/<%= run.id %>/invoices/<%= inv.invoice_number %>/pdf" class="invoice-download">Download PDF</a>
               <% } else { %>
                 <small class="muted">N/A (CLI run)</small>
               <% } %>
@@ -43,11 +55,3 @@
     </table>
   </div>
 <% } %>
-
-<div class="actions mt-2">
-  <a href="/runs/<%= run.id %>" role="button" class="outline secondary">Back to Run</a>
-  <% if (run.account_id) { %>
-    <a href="/accounts/<%= run.account_id %>/runs" role="button" class="outline secondary">All Runs</a>
-  <% } %>
-  <a href="/" role="button" class="outline secondary">Dashboard</a>
-</div>

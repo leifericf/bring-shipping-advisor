@@ -1,15 +1,33 @@
-<hgroup>
-  <h1>Run #<%= run.id %></h1>
-  <p>
-    <% if (run.account_name) { %><%= run.account_name %> &middot; <% } %>
-    Customer <code><%= run.customer_number %></code> &middot;
-    <%= run.created_at %>
-  </p>
-</hgroup>
+<ul class="breadcrumb">
+  <li><a href="/">Dashboard</a></li>
+  <% if (run.account_id) { %>
+    <li><a href="/accounts/<%= run.account_id %>/runs"><%= run.account_name || 'Account' %></a></li>
+  <% } %>
+  <li>Run #<%= run.id %></li>
+</ul>
 
-<p>
-  Status: <span class="status status-<%= run.status %>" id="run-status"><%= run.status %></span>
-</p>
+<h1>Run #<%= run.id %></h1>
+
+<div class="run-meta">
+  <% if (run.account_name) { %>
+    <div class="run-meta-item">
+      <span class="run-meta-label">Account</span>
+      <span class="run-meta-value"><a href="/accounts/<%= run.account_id %>/runs"><%= run.account_name %></a></span>
+    </div>
+  <% } %>
+  <div class="run-meta-item">
+    <span class="run-meta-label">Customer</span>
+    <span class="run-meta-value"><code><%= run.customer_number %></code></span>
+  </div>
+  <div class="run-meta-item">
+    <span class="run-meta-label">Date</span>
+    <span class="run-meta-value"><%= new Date(run.created_at + 'Z').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) %></span>
+  </div>
+  <div class="run-meta-item">
+    <span class="run-meta-label">Status</span>
+    <span class="run-meta-value"><span class="status status-<%= run.status %>" id="run-status"><%= run.status.replace(/_/g, ' ') %></span></span>
+  </div>
+</div>
 
 <% if (run.status !== 'completed' && run.status !== 'failed') { %>
   <article class="run-progress" id="progress-box" aria-busy="true">
@@ -22,8 +40,9 @@
         try {
           const res = await fetch('/api/runs/<%= run.id %>/status');
           const data = await res.json();
-          document.getElementById('run-status').textContent = data.status;
-          document.getElementById('run-status').className = 'status status-' + data.status;
+          const el = document.getElementById('run-status');
+          el.textContent = data.status.replace(/_/g, ' ');
+          el.className = 'status status-' + data.status;
 
           if (data.status === 'completed' || data.status === 'failed') {
             window.location.reload();
@@ -46,22 +65,27 @@
   </article>
 <% } %>
 
+<% if (run.status === 'completed') { %>
+  <div class="actions mb-1">
+    <% if (invoiceCount > 0) { %>
+      <a href="/runs/<%= run.id %>/invoices" role="button" class="outline">Invoices (<%= invoiceCount %>)</a>
+    <% } %>
+  </div>
+<% } %>
+
 <% if (resultsHtml) { %>
   <section class="results-content">
     <%- resultsHtml %>
   </section>
 <% } %>
 
-<div class="actions mt-2">
-  <% if (run.account_id) { %>
-    <a href="/accounts/<%= run.account_id %>/runs" role="button" class="outline secondary">Back to Runs</a>
-  <% } %>
-  <% if (invoiceCount > 0) { %>
-    <a href="/runs/<%= run.id %>/invoices" role="button" class="outline secondary">Invoices (<%= invoiceCount %>)</a>
-  <% } %>
-  <a href="/" role="button" class="outline secondary">Dashboard</a>
+<div class="danger-zone">
+  <h3>Delete this run</h3>
+  <p>This will permanently remove the run and all associated data (rates, invoices, analysis).</p>
   <form method="POST" action="/runs/<%= run.id %>/delete"
-        onsubmit="return confirm('Delete this run and all its data?')">
-    <button type="submit" class="outline btn-danger push-right">Delete Run</button>
+        onsubmit="return confirm('Delete this run and all its data? This cannot be undone.')">
+    <div class="form-actions">
+      <button type="submit" class="outline btn-danger">Delete Run</button>
+    </div>
   </form>
 </div>

@@ -1,6 +1,12 @@
+<ul class="breadcrumb">
+  <li><a href="/">Dashboard</a></li>
+  <li><a href="/accounts/<%= account.id %>/runs"><%= account.name %></a></li>
+  <li>Config</li>
+</ul>
+
 <hgroup>
-  <h1>Configuration: <%= account.name %></h1>
-  <p>Edit destinations, services, weight tiers, and analysis settings for this account.</p>
+  <h1>Configuration</h1>
+  <p><%= account.name %> &mdash; destinations, services, weight tiers, and analysis settings.</p>
 </hgroup>
 
 <form method="POST" action="/accounts/<%= account.id %>/config" id="config-form">
@@ -10,7 +16,7 @@
   <!-- ------------------------------------------------------------------ -->
 
   <section id="destinations-section">
-    <h2>Destinations</h2>
+    <h2>Destinations <span id="dest-count" class="dest-count"></span></h2>
     <p>Add or remove shipping destinations. Each destination needs a country name, ISO country code, and postal code.</p>
 
     <div class="table-wrap">
@@ -197,6 +203,10 @@ function setConfig(config) {
 function renderDestinations() {
   const config = getConfig();
   if (!config || !Array.isArray(config.destinations)) return;
+
+  // Update destination count badge
+  const countEl = document.getElementById('dest-count');
+  if (countEl) countEl.textContent = '(' + config.destinations.length + ')';
 
   const tbody = document.getElementById('dest-tbody');
   tbody.innerHTML = '';

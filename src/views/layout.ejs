@@ -3,7 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light">
   <title><%= typeof title !== 'undefined' ? title + ' \u2014 ' : '' %>Bring Shipping Analyzer</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#x1f4e6;</text></svg>">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
   <link rel="stylesheet" href="/style.css">
 </head>
@@ -15,7 +17,7 @@
       </ul>
       <ul>
         <li><a href="/">Dashboard</a></li>
-        <li><a href="/accounts/new">New Account</a></li>
+        <li><a href="/accounts/new" role="button" class="outline" style="padding:0.25rem 0.75rem;font-size:0.85rem;">+ New Account</a></li>
       </ul>
     </nav>
   </header>
@@ -29,7 +31,7 @@
   </main>
 
   <footer class="container">
-    <small>Bring Shipping Analyzer &mdash; Local Tool</small>
+    <small>Bring Shipping Analyzer</small>
   </footer>
 </body>
 </html>
