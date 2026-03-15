@@ -47,8 +47,12 @@
           if (data.status === 'completed' || data.status === 'failed') {
             window.location.reload();
           } else {
-            document.getElementById('progress-box').innerHTML =
-              'Pipeline is running: <strong>' + data.status.replace(/_/g, ' ') + '</strong>...';
+            const box = document.getElementById('progress-box');
+            box.textContent = '';
+            box.append('Pipeline is running: ');
+            const strong = document.createElement('strong');
+            strong.textContent = data.status.replace(/_/g, ' ');
+            box.append(strong, '...');
             poll();
           }
         } catch (e) {
