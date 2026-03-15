@@ -88,18 +88,18 @@
 <% } %>
 
 <% if (resultsHtml) { %>
-  <nav class="run-tabs">
-    <button class="run-tab active" data-tab="report">Report</button>
-    <button class="run-tab" data-tab="simulator">Mix Simulator</button>
-  </nav>
+  <div class="run-tabs" role="tablist" aria-label="Run results">
+    <button class="run-tab active" role="tab" aria-selected="true" aria-controls="tab-report" id="tab-btn-report" data-tab="report" tabindex="0">Report</button>
+    <button class="run-tab" role="tab" aria-selected="false" aria-controls="tab-simulator" id="tab-btn-simulator" data-tab="simulator" tabindex="-1">Mix Simulator</button>
+  </div>
 
-  <section class="run-tab-content active" id="tab-report">
+  <section class="run-tab-content active" id="tab-report" role="tabpanel" aria-labelledby="tab-btn-report" tabindex="0">
     <div class="results-content">
       <%- resultsHtml %>
     </div>
   </section>
 
-  <section class="run-tab-content" id="tab-simulator">
+  <section class="run-tab-content" id="tab-simulator" role="tabpanel" aria-labelledby="tab-btn-simulator" tabindex="0">
     <div id="simulator-app">
       <hgroup>
         <h2>Mix Simulator</h2>
@@ -357,15 +357,39 @@
   </section>
 
   <script>
-  // Tab switching
-  document.querySelectorAll('.run-tab').forEach(btn => {
-    btn.addEventListener('click', function() {
-      document.querySelectorAll('.run-tab').forEach(b => b.classList.remove('active'));
-      document.querySelectorAll('.run-tab-content').forEach(c => c.classList.remove('active'));
-      this.classList.add('active');
-      document.getElementById('tab-' + this.dataset.tab).classList.add('active');
+  // Accessible tab switching with keyboard navigation
+  (function() {
+    const tabs = Array.from(document.querySelectorAll('[role="tab"]'));
+    const panels = Array.from(document.querySelectorAll('[role="tabpanel"]'));
+
+    function activateTab(tab) {
+      tabs.forEach(t => {
+        t.classList.remove('active');
+        t.setAttribute('aria-selected', 'false');
+        t.setAttribute('tabindex', '-1');
+      });
+      panels.forEach(p => p.classList.remove('active'));
+
+      tab.classList.add('active');
+      tab.setAttribute('aria-selected', 'true');
+      tab.setAttribute('tabindex', '0');
+      tab.focus();
+      document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
+    }
+
+    tabs.forEach(tab => {
+      tab.addEventListener('click', () => activateTab(tab));
+      tab.addEventListener('keydown', e => {
+        const idx = tabs.indexOf(tab);
+        let target;
+        if (e.key === 'ArrowRight') target = tabs[(idx + 1) % tabs.length];
+        else if (e.key === 'ArrowLeft') target = tabs[(idx - 1 + tabs.length) % tabs.length];
+        else if (e.key === 'Home') target = tabs[0];
+        else if (e.key === 'End') target = tabs[tabs.length - 1];
+        if (target) { e.preventDefault(); activateTab(target); }
+      });
     });
-  });
+  })();
   </script>
 <% } %>
 
