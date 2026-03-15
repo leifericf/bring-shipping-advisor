@@ -15,18 +15,14 @@
   <% } else { %>
     <div class="account-grid">
       <% for (const account of accounts) { %>
-        <article>
-          <header><strong><%= account.name %></strong></header>
-          <p>
-            Customer: <code><%= account.customer_number %></code><br>
-            Origin: <code><%= account.origin_postal_code %></code>
-          </p>
-          <footer>
-            <div class="actions">
-              <a href="/accounts/<%= account.id %>/runs">Runs</a>
-              <a href="/accounts/<%= account.id %>/config">Config</a>
-              <a href="/accounts/<%= account.id %>/edit">Edit</a>
-            </div>
+        <article class="account-card">
+          <a href="/accounts/<%= account.id %>/runs" class="account-card-link">
+            <strong class="account-card-name"><%= account.name %></strong>
+            <span class="account-card-meta"><code><%= account.customer_number %></code> · <%= account.origin_postal_code %></span>
+          </a>
+          <footer class="account-card-footer">
+            <a href="/accounts/<%= account.id %>/config">Config</a>
+            <a href="/accounts/<%= account.id %>/edit">Edit</a>
           </footer>
         </article>
       <% } %>

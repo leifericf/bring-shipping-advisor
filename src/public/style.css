@@ -124,37 +124,52 @@ header.container nav a.nav-cta {
 
 .account-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
   gap: 1rem;
 }
 
-.account-grid article {
+.account-card {
   margin-bottom: 0;
-  transition: box-shadow 0.2s ease, transform 0.2s ease;
+  padding: 0;
+  transition: box-shadow 0.15s ease;
 }
 
-.account-grid article:hover {
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
-  transform: translateY(-2px);
+.account-card:hover {
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
 }
 
-.account-grid article > header {
-  padding: 0.75rem 1rem;
+.account-card-link {
+  display: block;
+  padding: 1rem 1.25rem;
+  text-decoration: none;
+  color: inherit;
 }
 
-.account-grid article > footer {
-  padding: 0.75rem 1rem;
+.account-card-name {
+  display: block;
+  font-size: 1rem;
+  margin-bottom: 0.25rem;
 }
 
-.account-grid article > p {
-  padding: 0 1rem;
-  margin: 0.5rem 0;
-  font-size: 0.9rem;
-}
-
-.account-grid .actions [role="button"] {
+.account-card-meta {
+  display: block;
   font-size: 0.85rem;
-  padding: 0.3rem 0.7rem;
+  color: var(--pico-muted-color);
+}
+
+.account-card-meta code {
+  font-size: 0.85em;
+}
+
+.account-card-footer {
+  display: flex;
+  gap: 1rem;
+  padding: 0 1.25rem 1rem;
+  font-size: 0.85rem;
+  /* Override Pico article > footer defaults */
+  border-top: none;
+  margin: 0;
+  background-color: transparent;
 }
 
 /* -- Empty states ---------------------------------------------------------- */
