@@ -173,6 +173,76 @@ fieldset legend {
   display: none;
 }
 
+/* -- Destinations manager -------------------------------------------------- */
+
+#destinations-section h2 {
+  font-size: 1.25rem;
+  margin-bottom: 0.25rem;
+}
+
+#destinations-section > p {
+  margin-bottom: 1rem;
+  color: var(--pico-muted-color);
+  font-size: 0.9rem;
+}
+
+#dest-table code {
+  font-size: 0.85em;
+}
+
+.dest-remove-btn {
+  padding: 0.2rem 0.6rem !important;
+  font-size: 0.8rem !important;
+  --pico-color: #dc3545;
+  --pico-border-color: #dc3545;
+}
+.dest-remove-btn:hover {
+  --pico-color: #fff;
+  --pico-background-color: #dc3545;
+  --pico-border-color: #dc3545;
+}
+
+.muted {
+  color: var(--pico-muted-color);
+}
+
+/* Add-destination form inside <details> */
+.dest-add-form {
+  padding-top: 0.5rem;
+}
+
+.dest-add-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 0.75rem;
+  align-items: end;
+}
+
+.dest-add-fields label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-bottom: 0;
+}
+
+.dest-add-fields input {
+  margin-bottom: 0;
+}
+
+.dest-add-actions {
+  margin-top: 0.75rem;
+}
+
+.dest-add-actions button {
+  margin-bottom: 0;
+}
+
+.dest-add-error {
+  color: #dc3545;
+  font-size: 0.9rem;
+  margin-top: 0.5rem;
+  display: none;
+}
+
 /* -- Run detail ------------------------------------------------------------ */
 
 /* Progress box */

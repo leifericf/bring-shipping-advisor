@@ -4,22 +4,215 @@
 </hgroup>
 
 <form method="POST" action="/accounts/<%= account.id %>/config" id="config-form">
-  <p>
-    Edit the JSON configuration below. This controls which destinations, services, and weight tiers
-    are fetched, and how the analysis is performed.
-  </p>
 
-  <textarea name="config" class="config-editor" id="config-editor" spellcheck="false"><%= configJson %></textarea>
-  <div class="config-error" id="config-error"></div>
+  <!-- ------------------------------------------------------------------ -->
+  <!-- Destinations UI                                                     -->
+  <!-- ------------------------------------------------------------------ -->
+
+  <section id="destinations-section">
+    <h2>Destinations</h2>
+    <p>Add or remove shipping destinations. Each destination needs a country name, ISO country code, and postal code.</p>
+
+    <div class="table-wrap">
+      <table id="dest-table">
+        <thead>
+          <tr>
+            <th>Country</th>
+            <th>Code</th>
+            <th>Postal Code</th>
+            <th>Zone</th>
+            <th>Description</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="dest-tbody">
+          <!-- filled by JS -->
+        </tbody>
+      </table>
+    </div>
+
+    <details id="add-dest-details">
+      <summary>Add destination</summary>
+      <div class="dest-add-form">
+        <div class="dest-add-fields">
+          <label>
+            Country *
+            <input type="text" id="new-country" placeholder="Sweden" required>
+          </label>
+          <label>
+            Code *
+            <input type="text" id="new-code" placeholder="SE" maxlength="2" required>
+          </label>
+          <label>
+            Postal Code *
+            <input type="text" id="new-postal" placeholder="11122" required>
+          </label>
+          <label>
+            Zone
+            <input type="number" id="new-zone" placeholder="1" min="1">
+          </label>
+          <label>
+            Description
+            <input type="text" id="new-desc" placeholder="Stockholm">
+          </label>
+        </div>
+        <div class="dest-add-actions">
+          <button type="button" id="add-dest-btn">Add Destination</button>
+        </div>
+        <div class="dest-add-error" id="dest-add-error"></div>
+      </div>
+    </details>
+  </section>
+
+  <!-- ------------------------------------------------------------------ -->
+  <!-- Raw JSON editor (advanced)                                          -->
+  <!-- ------------------------------------------------------------------ -->
+
+  <details class="mt-2">
+    <summary>Advanced: Raw JSON editor</summary>
+    <p>
+      Edit the full JSON configuration directly. Changes here override the destinations table above.
+    </p>
+    <textarea name="config" class="config-editor" id="config-editor" spellcheck="false"><%= configJson %></textarea>
+    <div class="config-error" id="config-error"></div>
+    <div class="form-actions bt-0">
+      <button type="button" class="outline secondary" onclick="formatJson()">Format JSON</button>
+      <button type="button" class="outline secondary" onclick="syncTableFromEditor()">Reload table from JSON</button>
+    </div>
+  </details>
 
   <div class="form-actions">
     <button type="submit">Save Configuration</button>
-    <button type="button" class="outline secondary" onclick="formatJson()">Format JSON</button>
     <a href="/accounts/<%= account.id %>/runs" role="button" class="outline secondary">Back to Runs</a>
   </div>
 </form>
 
 <script>
+// ---------------------------------------------------------------------------
+// State helpers
+// ---------------------------------------------------------------------------
+
+function getConfig() {
+  try {
+    return JSON.parse(document.getElementById('config-editor').value);
+  } catch { return null; }
+}
+
+function setConfig(config) {
+  document.getElementById('config-editor').value = JSON.stringify(config, null, 2);
+}
+
+// ---------------------------------------------------------------------------
+// Render destinations table
+// ---------------------------------------------------------------------------
+
+function renderDestinations() {
+  const config = getConfig();
+  if (!config || !Array.isArray(config.destinations)) return;
+
+  const tbody = document.getElementById('dest-tbody');
+  tbody.innerHTML = '';
+
+  config.destinations.forEach((d, i) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML =
+      '<td>' + esc(d.country) + '</td>' +
+      '<td><code>' + esc(d.code) + '</code></td>' +
+      '<td>' + esc(d.postalCode) + '</td>' +
+      '<td>' + (d.zone != null ? esc(String(d.zone)) : '<span class="muted">—</span>') + '</td>' +
+      '<td>' + (d.desc ? esc(d.desc) : '') + '</td>' +
+      '<td><button type="button" class="outline secondary dest-remove-btn" data-index="' + i + '">Remove</button></td>';
+    tbody.appendChild(tr);
+  });
+
+  // Bind remove buttons
+  tbody.querySelectorAll('.dest-remove-btn').forEach(btn => {
+    btn.addEventListener('click', function () {
+      removeDest(Number(this.dataset.index));
+    });
+  });
+}
+
+function esc(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+// ---------------------------------------------------------------------------
+// Add / Remove
+// ---------------------------------------------------------------------------
+
+function addDest() {
+  const errorEl = document.getElementById('dest-add-error');
+  errorEl.style.display = 'none';
+
+  const country = document.getElementById('new-country').value.trim();
+  const code    = document.getElementById('new-code').value.trim().toUpperCase();
+  const postal  = document.getElementById('new-postal').value.trim();
+  const zoneRaw = document.getElementById('new-zone').value.trim();
+  const desc    = document.getElementById('new-desc').value.trim();
+
+  if (!country || !code || !postal) {
+    errorEl.textContent = 'Country, Code, and Postal Code are required.';
+    errorEl.style.display = 'block';
+    return;
+  }
+
+  if (code.length !== 2) {
+    errorEl.textContent = 'Country code must be exactly 2 letters (ISO 3166-1 alpha-2).';
+    errorEl.style.display = 'block';
+    return;
+  }
+
+  const config = getConfig();
+  if (!config) {
+    errorEl.textContent = 'Cannot add — underlying JSON is invalid. Fix it in the raw editor first.';
+    errorEl.style.display = 'block';
+    return;
+  }
+  if (!Array.isArray(config.destinations)) config.destinations = [];
+
+  // Check for duplicate (same code + postalCode)
+  const dup = config.destinations.find(d => d.code === code && d.postalCode === postal);
+  if (dup) {
+    errorEl.textContent = 'Duplicate: a destination with code ' + code + ' and postal code ' + postal + ' already exists.';
+    errorEl.style.display = 'block';
+    return;
+  }
+
+  const entry = { country, code, postalCode: postal };
+  entry.zone = zoneRaw !== '' ? Number(zoneRaw) : null;
+  if (desc) entry.desc = desc;
+
+  config.destinations.push(entry);
+  setConfig(config);
+  renderDestinations();
+
+  // Clear inputs
+  document.getElementById('new-country').value = '';
+  document.getElementById('new-code').value = '';
+  document.getElementById('new-postal').value = '';
+  document.getElementById('new-zone').value = '';
+  document.getElementById('new-desc').value = '';
+}
+
+function removeDest(index) {
+  const config = getConfig();
+  if (!config || !Array.isArray(config.destinations)) return;
+
+  const dest = config.destinations[index];
+  if (!confirm('Remove ' + dest.country + ' — ' + (dest.desc || dest.postalCode) + '?')) return;
+
+  config.destinations.splice(index, 1);
+  setConfig(config);
+  renderDestinations();
+}
+
+// ---------------------------------------------------------------------------
+// JSON editor helpers
+// ---------------------------------------------------------------------------
+
 function formatJson() {
   const editor = document.getElementById('config-editor');
   const errorEl = document.getElementById('config-error');
@@ -33,6 +226,22 @@ function formatJson() {
   }
 }
 
+function syncTableFromEditor() {
+  const errorEl = document.getElementById('config-error');
+  const config = getConfig();
+  if (!config) {
+    errorEl.textContent = 'Cannot reload — JSON is invalid.';
+    errorEl.style.display = 'block';
+    return;
+  }
+  errorEl.style.display = 'none';
+  renderDestinations();
+}
+
+// ---------------------------------------------------------------------------
+// Form submit validation
+// ---------------------------------------------------------------------------
+
 document.getElementById('config-form').addEventListener('submit', function(e) {
   const editor = document.getElementById('config-editor');
   const errorEl = document.getElementById('config-error');
@@ -41,8 +250,17 @@ document.getElementById('config-form').addEventListener('submit', function(e) {
     errorEl.style.display = 'none';
   } catch (err) {
     e.preventDefault();
-    errorEl.textContent = 'Cannot save \u2014 invalid JSON: ' + err.message;
+    errorEl.textContent = 'Cannot save — invalid JSON: ' + err.message;
     errorEl.style.display = 'block';
+    // Open the advanced section so the user can see the error
+    document.querySelector('details.mt-2').open = true;
   }
 });
+
+// ---------------------------------------------------------------------------
+// Bind events & initial render
+// ---------------------------------------------------------------------------
+
+document.getElementById('add-dest-btn').addEventListener('click', addDest);
+renderDestinations();
 </script>
