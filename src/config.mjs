@@ -73,7 +73,7 @@ export function loadConfig() {
     process.exit(1);
   }
 
-  const analysisRequired = ['vatMultiplier', 'safeDefaultZone', 'primaryDomesticService', 'cheapestInternationalService', 'countryGroupings'];
+  const analysisRequired = ['vatMultiplier', 'safeDefaultZone', 'primaryDomesticService', 'cheapestInternationalService'];
   const analysisMissing = analysisRequired.filter(k => !(k in analysis));
   if (analysisMissing.length > 0) {
     console.error(`Error: config.json "analysis" missing fields: ${analysisMissing.join(', ')}`);

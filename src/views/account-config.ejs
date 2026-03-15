@@ -117,6 +117,26 @@
   </section>
 
   <!-- ------------------------------------------------------------------ -->
+  <!-- Analysis settings                                                   -->
+  <!-- ------------------------------------------------------------------ -->
+
+  <section id="analysis-section">
+    <h2>Analysis Settings</h2>
+
+    <label>
+      International zone merge threshold
+      <div class="threshold-control">
+        <input type="range" id="merge-threshold" min="0" max="50" step="1" value="10">
+        <output id="merge-threshold-value">10%</output>
+      </div>
+    </label>
+    <p class="help-text">
+      Countries with rates within this percentage of each other are merged into one shipping zone.
+      Lower = more zones (stricter). Higher = fewer zones (more merging). Default: 10%.
+    </p>
+  </section>
+
+  <!-- ------------------------------------------------------------------ -->
   <!-- Raw JSON editor (advanced)                                          -->
   <!-- ------------------------------------------------------------------ -->
 
@@ -571,6 +591,29 @@ function removeDest(index) {
 }
 
 // ---------------------------------------------------------------------------
+// Analysis settings
+// ---------------------------------------------------------------------------
+
+function initAnalysisSettings() {
+  const slider = document.getElementById('merge-threshold');
+  const output = document.getElementById('merge-threshold-value');
+  const config = getConfig();
+  if (config && config.analysis && config.analysis.intlZoneMergeThreshold != null) {
+    slider.value = Math.round(config.analysis.intlZoneMergeThreshold * 100);
+  }
+  output.textContent = slider.value + '%';
+
+  slider.addEventListener('input', function() {
+    output.textContent = this.value + '%';
+    const config = getConfig();
+    if (!config) return;
+    if (!config.analysis) config.analysis = {};
+    config.analysis.intlZoneMergeThreshold = Number(this.value) / 100;
+    setConfig(config);
+  });
+}
+
+// ---------------------------------------------------------------------------
 // JSON editor helpers
 // ---------------------------------------------------------------------------
 
@@ -597,6 +640,7 @@ function syncTableFromEditor() {
   }
   errorEl.style.display = 'none';
   renderDestinations();
+  initAnalysisSettings();
 }
 
 // ---------------------------------------------------------------------------
@@ -624,4 +668,5 @@ document.getElementById('config-form').addEventListener('submit', function(e) {
 
 document.getElementById('add-dest-btn').addEventListener('click', addDest);
 renderDestinations();
+initAnalysisSettings();
 </script>

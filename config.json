@@ -41,10 +41,7 @@
     "primaryDomesticService": "3584",
     "cheapestInternationalService": "PICKUP_PARCEL",
     "domesticZoneCount": 7,
-    "countryGroupings": {
-      "nordic": ["SE", "DK", "FI"],
-      "remote": ["IS", "GL", "FO", "JP"]
-    },
+    "intlZoneMergeThreshold": 0.10,
     "domesticWeightTiers": [
       { "name": "0-250g", "key": "250" },
       { "name": "250-750g", "key": "750" },

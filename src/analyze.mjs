@@ -184,6 +184,89 @@ function computeProfitability(lineItems, rates, roadToll) {
   };
 }
 
+// ── International zone clustering ────────────────────────────────────────────
+
+/**
+ * Auto-group international countries into shipping zones based on rate similarity.
+ * Countries whose nicePrice per bracket is within `intlZoneMergeThreshold` (%)
+ * of each other are merged into one zone; the zone charges the highest price.
+ * Returns an array of zones sorted cheapest-first, each { codes, rates }.
+ */
+function clusterInternationalZones(rates, countryCodes, intlShopifyBrackets, serviceId) {
+  const threshold = analysis.intlZoneMergeThreshold ?? 0.10; // default 10%
+
+  // Compute nicePrice vector per country
+  const countryPrices = [];
+  for (const code of countryCodes) {
+    const prices = intlShopifyBrackets.map(b => {
+      const r = rates.find(r => r.country_code === code && r.service_id === serviceId && String(r.weight_g) === b.weight);
+      return r ? nicePrice(Math.ceil(parseFloat(r.price_nok))) : null;
+    });
+    if (prices.every(p => p === null)) continue; // skip countries with no rate data
+    countryPrices.push({ code, prices });
+  }
+
+  // Sort by price vector (cheapest first)
+  countryPrices.sort((a, b) => {
+    for (let i = 0; i < a.prices.length; i++) {
+      const diff = (a.prices[i] ?? 0) - (b.prices[i] ?? 0);
+      if (diff !== 0) return diff;
+    }
+    return 0;
+  });
+
+  // Greedy merge: walk sorted countries, merge into current zone if within threshold
+  const zones = []; // each { codes, minPrices, maxPrices }
+
+  for (const country of countryPrices) {
+    let merged = false;
+
+    if (zones.length > 0) {
+      const last = zones[zones.length - 1];
+      let canMerge = true;
+
+      for (let i = 0; i < country.prices.length; i++) {
+        const cp = country.prices[i];
+        if (cp === null) continue;
+        const lo = Math.min(last.minPrices[i] ?? cp, cp);
+        const hi = Math.max(last.maxPrices[i] ?? cp, cp);
+        if (lo > 0 && (hi - lo) / lo > threshold) {
+          canMerge = false;
+          break;
+        }
+      }
+
+      if (canMerge) {
+        last.codes.push(country.code);
+        for (let i = 0; i < country.prices.length; i++) {
+          if (country.prices[i] !== null) {
+            last.minPrices[i] = Math.min(last.minPrices[i] ?? country.prices[i], country.prices[i]);
+            last.maxPrices[i] = Math.max(last.maxPrices[i] ?? country.prices[i], country.prices[i]);
+          }
+        }
+        merged = true;
+      }
+    }
+
+    if (!merged) {
+      zones.push({
+        codes: [country.code],
+        minPrices: [...country.prices],
+        maxPrices: [...country.prices],
+      });
+    }
+  }
+
+  // Output: customer price = max price per bracket (conservative)
+  return zones.map(z => ({
+    codes: z.codes,
+    rates: intlShopifyBrackets.map((b, i) => ({
+      name: b.name,
+      price: z.maxPrices[i],
+    })),
+  }));
+}
+
 // ── HTML report generation ───────────────────────────────────────────────────
 
 function generateReport(rates, invoiceAnalysis, lineItems) {
@@ -197,7 +280,6 @@ function generateReport(rates, invoiceAnalysis, lineItems) {
   const safeZone = analysis.safeDefaultZone;
   const zoneCount = analysis.domesticZoneCount;
   const countryNames = config.countryNames;
-  const { nordic: nordicCodes, remote: remoteCodes } = analysis.countryGroupings;
 
   const allDomesticRates = rates.filter(r => r.country_code === config.originCountry);
   const shopifyBrackets = analysis.domesticShopifyBrackets;
@@ -222,24 +304,10 @@ function generateReport(rates, invoiceAnalysis, lineItems) {
     };
   });
 
-  const nordicRates = intlShopifyBrackets.map(b => {
-    const prices = nordicCodes.map(code => {
-      const r = rates.find(r => r.country_code === code && r.service_id === cheapestIntl && String(r.weight_g) === b.weight);
-      return r ? Math.ceil(parseFloat(r.price_nok)) : 0;
-    });
-    return { name: b.name, price: nicePrice(Math.max(...prices)) };
-  });
-
-  const remoteRates = intlShopifyBrackets.map(b => {
-    const prices = remoteCodes.map(code => {
-      const r = rates.find(r => r.country_code === code && r.service_id === cheapestIntl && String(r.weight_g) === b.weight);
-      return r ? Math.ceil(parseFloat(r.price_nok)) : 0;
-    });
-    return { name: b.name, price: nicePrice(Math.max(...prices)) };
-  });
-
-  const nordicCountryList = nordicCodes.map(c => countryNames[c]).filter(Boolean).join(', ');
-  const remoteCountryList = remoteCodes.map(c => countryNames[c]).filter(Boolean).join(', ');
+  // Auto-cluster international countries into shipping zones by rate similarity.
+  // Countries that produce the same nicePrice for every bracket share a zone.
+  const intlCodes = Object.keys(countryNames);
+  const intlZones = clusterInternationalZones(rates, intlCodes, intlShopifyBrackets, cheapestIntl);
 
   // ── Compute profitability ────────────────────────────────────────────────
 
@@ -258,8 +326,7 @@ function generateReport(rates, invoiceAnalysis, lineItems) {
 
   // 1) Hero: Recommended Rates
   html += renderHeroSection(
-    norwayRates, nordicRates, remoteRates,
-    nordicCountryList, remoteCountryList,
+    norwayRates, intlZones, countryNames,
     shopifyBrackets, intlShopifyBrackets,
     vatPct, roadToll, safeZone, primaryService, cheapestIntl,
     serviceNames,
@@ -303,14 +370,12 @@ function generateReport(rates, invoiceAnalysis, lineItems) {
     cli += `    ${r.name.padEnd(12)} ${r.price != null ? r.price + ' kr' : 'N/A'}${svcLabel}\n`;
   }
 
-  cli += `\n  ${nordicCountryList}\n`;
-  for (const r of nordicRates) {
-    cli += `    ${r.name.padEnd(12)} ${r.price} kr\n`;
-  }
-
-  cli += `\n  ${remoteCountryList}\n`;
-  for (const r of remoteRates) {
-    cli += `    ${r.name.padEnd(12)} ${r.price} kr\n`;
+  for (const zone of intlZones) {
+    const zoneNames = zone.codes.map(c => countryNames[c]).filter(Boolean).join(', ');
+    cli += `\n  ${zoneNames}\n`;
+    for (const r of zone.rates) {
+      cli += `    ${r.name.padEnd(12)} ${r.price != null ? r.price + ' kr' : 'N/A'}\n`;
+    }
   }
 
   cli += `\n  Norway: Zone ${safeZone} pricing, incl. road toll + ${vatPct}% VAT.`;
@@ -334,8 +399,7 @@ function generateReport(rates, invoiceAnalysis, lineItems) {
 // ── Section renderers ────────────────────────────────────────────────────────
 
 function renderHeroSection(
-  norwayRates, nordicRates, remoteRates,
-  nordicCountryList, remoteCountryList,
+  norwayRates, intlZones, countryNames,
   shopifyBrackets, intlShopifyBrackets,
   vatPct, roadToll, safeZone, primaryService, cheapestIntl,
   serviceNames,
@@ -354,7 +418,7 @@ function renderHeroSection(
 
   let h = `<div class="report-hero">`;
   h += `<h2>Recommended Shipping Rates</h2>`;
-  h += `<p class="report-subtitle">Suggested customer-facing prices for your online store.</p>`;
+  h += `<p class="report-subtitle">Suggested customer-facing prices for your online store. ${intlZones.length + 1} shipping zones total (1 domestic + ${intlZones.length} international).</p>`;
 
   h += `<table class="rate-card">`;
   h += `<thead><tr><th>Destination</th>`;
@@ -377,19 +441,15 @@ function renderHeroSection(
   }
   h += `</tr>`;
 
-  // Nordic row
-  h += `<tr><td>${esc(nordicCountryList)}</td>`;
-  for (let i = 0; i < intlShopifyBrackets.length; i++) {
-    h += `<td colspan="${intlColspans[i]}">${nordicRates[i].price} kr</td>`;
+  // International zone rows (auto-clustered)
+  for (const zone of intlZones) {
+    const zoneLabel = zone.codes.map(c => countryNames[c]).filter(Boolean).join(', ');
+    h += `<tr><td>${esc(zoneLabel)}</td>`;
+    for (let i = 0; i < intlShopifyBrackets.length; i++) {
+      h += `<td colspan="${intlColspans[i]}">${zone.rates[i].price != null ? zone.rates[i].price + ' kr' : 'N/A'}</td>`;
+    }
+    h += `</tr>`;
   }
-  h += `</tr>`;
-
-  // Remote row
-  h += `<tr><td>${esc(remoteCountryList)}</td>`;
-  for (let i = 0; i < intlShopifyBrackets.length; i++) {
-    h += `<td colspan="${intlColspans[i]}">${remoteRates[i].price} kr</td>`;
-  }
-  h += `</tr>`;
 
   h += `</tbody></table>`;
 
@@ -404,7 +464,7 @@ function renderHeroSection(
   } else {
     h += `Norway: ${esc(serviceNames[primaryService] || primaryService)} (${esc(primaryService)}), Zone ${esc(safeZone)} pricing, incl. road toll (~${roadToll} kr) + ${vatPct}% VAT.<br>`;
   }
-  h += `International: ${esc(serviceNames[cheapestIntl] || cheapestIntl)} (${esc(cheapestIntl)}), no VAT. Regions use the highest rate in each group.<br>`;
+  h += `International: ${esc(serviceNames[cheapestIntl] || cheapestIntl)} (${esc(cheapestIntl)}), no VAT. Countries grouped by identical customer-facing rates.<br>`;
   h += `Prices rounded up to the nearest 9.`;
   h += `</p>`;
 
@@ -714,7 +774,8 @@ function renderAssumptions(primaryService, cheapestIntl, vatMultiplier, roadToll
   h += `<tr><th>Road toll</th><td>~${roadToll} kr per shipment (avg from invoices, Norway only)</td></tr>`;
   h += `<tr><th>Norway pricing zone</th><td>Zone ${esc(safeZone)} &mdash; covers most of the country. Zone 1 (Oslo) is cheapest, Zone ${zoneCount} (Finnmark) ~2&times; Zone 1</td></tr>`;
   h += `<tr><th>Price rounding</th><td>Rounded up to next "nice" price ending in 9</td></tr>`;
-  h += `<tr><th>International grouping</th><td>Uses highest rate in each country group so you never lose money on any destination</td></tr>`;
+  const mergePct = Math.round((analysis.intlZoneMergeThreshold ?? 0.10) * 100);
+  h += `<tr><th>International grouping</th><td>Countries with rates within ${mergePct}% of each other are merged into one zone. The zone charges the highest rate so you never lose money. Adjust <code>intlZoneMergeThreshold</code> in the account config to change.</td></tr>`;
   h += `<tr><th>Zone caveat</th><td>Zone numbers can differ per service for the same postal code</td></tr>`;
   h += `</tbody></table>`;
 
