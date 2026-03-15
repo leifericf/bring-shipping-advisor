@@ -71,11 +71,11 @@ async function fetchRates(destination, service, weightGrams) {
 
   const netPrice = product.price?.netPrice?.priceWithoutAdditionalServices?.amountWithoutVAT;
   const listPrice = product.price?.listPrice?.priceWithoutAdditionalServices?.amountWithoutVAT;
-  const price = netPrice || listPrice;
+  const price = netPrice != null ? netPrice : listPrice;
   const displayName = product.guiInformation?.displayName || service.name;
   const zone = product.price?.zones?.totalZoneCount;
 
-  if (price === undefined || price === null) return null;
+  if (price == null) return null;
 
   return { price: parseFloat(price), serviceName: displayName, zone };
 }
