@@ -46,7 +46,7 @@ function analyzeInvoices(lineItems) {
     const desc = item.description || '';
 
     if (desc.includes('Road toll')) {
-      const price = parseFloat(item.agreement_price) || 0;
+      const price = item.agreement_price || 0;
       if (price > 0) roadTolls.push(price);
       continue;
     }
@@ -59,9 +59,9 @@ function analyzeInvoices(lineItems) {
     }
 
     byProduct[key].count++;
-    byProduct[key].totalAgreement += parseFloat(item.agreement_price) || 0;
+    byProduct[key].totalAgreement += item.agreement_price || 0;
     if (item.weight_kg) {
-      byProduct[key].weights.push(parseFloat(item.weight_kg));
+      byProduct[key].weights.push(item.weight_kg);
     }
   }
 
@@ -92,11 +92,11 @@ function buildShipmentProfiles(lineItems) {
     }
 
     const s = shipments.get(key);
-    s.totalCost += parseFloat(item.agreement_price) || 0;
+    s.totalCost += item.agreement_price || 0;
 
     const desc = item.description || '';
     if (!desc.includes('Road toll') && !desc.includes('Surcharge') && item.weight_kg) {
-      s.weight = parseFloat(item.weight_kg);
+      s.weight = item.weight_kg;
     }
   }
 
@@ -158,9 +158,9 @@ function computeProfitability(lineItems, rates, roadToll) {
   }));
 
   for (const bracket of brackets) {
-    const rate = allDomesticRates.find(r => r.service_id === bracket.serviceId && r.zone === safeZone && String(r.weight_g) === bracket.rateWeight);
+    const rate = allDomesticRates.find(r => r.service_id === bracket.serviceId && r.zone === safeZone && r.weight_g === Number(bracket.rateWeight));
     if (rate) {
-      bracket.shopifyPrice = nicePrice(Math.ceil((parseFloat(rate.price_nok) + roadToll) * vatMultiplier));
+      bracket.shopifyPrice = nicePrice(Math.ceil((rate.price_nok + roadToll) * vatMultiplier));
       bracket.revenueExVat = bracket.shopifyPrice / vatMultiplier;
     }
   }
@@ -257,8 +257,8 @@ function clusterInternationalZones(rates, countryCodes, intlShopifyBrackets, ser
   const countryPrices = [];
   for (const code of countryCodes) {
     const prices = intlShopifyBrackets.map(b => {
-      const r = rates.find(r => r.country_code === code && r.service_id === serviceId && String(r.weight_g) === b.weight);
-      return r ? nicePrice(Math.ceil(parseFloat(r.price_nok))) : null;
+      const r = rates.find(r => r.country_code === code && r.service_id === serviceId && r.weight_g === Number(b.weight));
+      return r ? nicePrice(Math.ceil(r.price_nok)) : null;
     });
     if (prices.every(p => p === null)) continue; // skip countries with no rate data
     countryPrices.push({ code, prices });
@@ -356,11 +356,11 @@ function generateReport(rates, invoiceAnalysis, lineItems) {
 
   const norwayRates = shopifyBrackets.map(b => {
     const svcId = b.serviceId || primaryService;
-    const rate = allDomesticRates.find(r => r.service_id === svcId && r.zone === safeZone && String(r.weight_g) === b.rateWeight);
+    const rate = allDomesticRates.find(r => r.service_id === svcId && r.zone === safeZone && r.weight_g === Number(b.rateWeight));
     if (!rate) return { name: b.name, price: null, serviceId: svcId };
     return {
       name: b.name,
-      price: nicePrice(Math.ceil((parseFloat(rate.price_nok) + roadToll) * vatMultiplier)),
+      price: nicePrice(Math.ceil((rate.price_nok + roadToll) * vatMultiplier)),
       serviceId: svcId,
     };
   });
@@ -502,8 +502,8 @@ function renderHeroSection({
   const intlZoneDomesticPrices = intlZones.map(zone => {
     return shopifyBrackets.map(b => {
       const prices = zone.codes.map(code => {
-        const r = allRates.find(r => r.country_code === code && r.service_id === cheapestIntl && String(r.weight_g) === b.rateWeight);
-        return r ? nicePrice(Math.ceil(parseFloat(r.price_nok))) : null;
+        const r = allRates.find(r => r.country_code === code && r.service_id === cheapestIntl && r.weight_g === Number(b.rateWeight));
+        return r ? nicePrice(Math.ceil(r.price_nok)) : null;
       }).filter(p => p !== null);
       return prices.length > 0 ? Math.max(...prices) : null;
     });
@@ -660,9 +660,9 @@ function renderNorwayZoneDetails(allDomesticRates, roadToll, vatMultiplier, vatP
     const svcId = bracket.serviceId || primaryService;
     h += `<tr><td>${esc(bracket.name)}</td>`;
     for (const zone of zonesForTable) {
-      const rate = allDomesticRates.find(r => r.service_id === svcId && r.zone === zone && String(r.weight_g) === bracket.rateWeight);
+      const rate = allDomesticRates.find(r => r.service_id === svcId && r.zone === zone && r.weight_g === Number(bracket.rateWeight));
       if (rate) {
-        const price = nicePrice(Math.ceil((parseFloat(rate.price_nok) + roadToll) * vatMultiplier));
+        const price = nicePrice(Math.ceil((rate.price_nok + roadToll) * vatMultiplier));
         h += `<td>${price} kr</td>`;
       } else {
         h += `<td>N/A</td>`;
@@ -687,8 +687,8 @@ function renderNorwayZoneDetails(allDomesticRates, roadToll, vatMultiplier, vatP
       const z = String(zone);
       h += `<tr><td>${zone}</td>`;
       for (const w of svcWeights) {
-        const rate = allDomesticRates.find(r => r.service_id === svcId && r.zone === z && String(r.weight_g) === w);
-        h += `<td>${rate ? fmtNok(parseFloat(rate.price_nok)) : 'N/A'}</td>`;
+        const rate = allDomesticRates.find(r => r.service_id === svcId && r.zone === z && r.weight_g === Number(w));
+        h += `<td>${rate ? fmtNok(rate.price_nok) : 'N/A'}</td>`;
       }
       h += `</tr>`;
     }
@@ -715,8 +715,8 @@ function renderInternationalDetails(rates, countryNames, cheapestIntl, serviceNa
   for (const [code, name] of Object.entries(countryNames)) {
     h += `<tr><td>${esc(name)}</td>`;
     for (const w of intlWeightColumns) {
-      const rate = rates.find(r => r.country_code === code && r.service_id === cheapestIntl && String(r.weight_g) === w);
-      h += `<td>${rate ? Math.ceil(parseFloat(rate.price_nok)) : 'N/A'}</td>`;
+      const rate = rates.find(r => r.country_code === code && r.service_id === cheapestIntl && r.weight_g === Number(w));
+      h += `<td>${rate ? Math.ceil(rate.price_nok) : 'N/A'}</td>`;
     }
     h += `</tr>`;
   }
@@ -937,15 +937,13 @@ async function main() {
   const rates = getShippingRates(RUN_ID).map(r => ({
     ...r,
     zone: r.zone != null ? String(r.zone).replace(/\.0$/, '') : '',
-    weight_g: String(r.weight_g),
-    price_nok: String(r.price_nok),
+    price_nok: r.price_nok ?? 0,
   }));
   const lineItems = getInvoiceLineItems(RUN_ID).map(r => ({
     ...r,
-    weight_kg: r.weight_kg != null ? String(r.weight_kg) : '',
-    agreement_price: String(r.agreement_price ?? 0),
-    gross_price: String(r.gross_price ?? 0),
-    discount: String(r.discount ?? 0),
+    agreement_price: r.agreement_price ?? 0,
+    gross_price: r.gross_price ?? 0,
+    discount: r.discount ?? 0,
   }));
 
   console.log(`Loaded ${rates.length} shipping rates from DB`);
