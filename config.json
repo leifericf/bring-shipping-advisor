@@ -37,6 +37,7 @@
 
   "analysis": {
     "vatMultiplier": 1.25,
+    "vatInclusive": true,
     "safeDefaultZone": "3",
     "primaryDomesticService": "3584",
     "cheapestInternationalService": "PICKUP_PARCEL",

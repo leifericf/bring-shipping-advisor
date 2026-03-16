@@ -14,7 +14,7 @@ export function renderCliSummary(model) {
   const {
     norwayRates, intlZones, countryNames,
     usedServices, serviceNames, cheapestIntl,
-    safeZone, vatPct, profitability,
+    safeZone, vatPct, vatInclusive, profitability,
   } = model;
 
   const multiService = usedServices.length > 1;
@@ -40,7 +40,8 @@ export function renderCliSummary(model) {
   });
 
   lines.push('');
-  lines.push(`  Norway: Zone ${safeZone} pricing, incl. road toll + ${vatPct}% VAT.`);
+  const vatNote = vatInclusive ? `incl. road toll + ${vatPct}% VAT` : `incl. road toll, ex VAT`;
+  lines.push(`  Norway: Zone ${safeZone} pricing, ${vatNote}.`);
 
   if (multiService) {
     const svcDesc = usedServices.map(s => `${serviceNames[s] || s} (${s})`).join(', ');

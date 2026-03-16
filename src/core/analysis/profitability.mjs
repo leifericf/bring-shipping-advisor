@@ -20,12 +20,13 @@ import { isLossMaking, matchesBracket } from './predicates.mjs';
 /**
  * Build bracket definitions with pricing from rate lookup.
  */
-function buildPricedBrackets(shopifyBrackets, primaryService, rateLookup, safeZone, roadToll, vatMultiplier) {
+function buildPricedBrackets(shopifyBrackets, primaryService, rateLookup, safeZone, roadToll, vatMultiplier, vatInclusive) {
   return shopifyBrackets.map(b => {
     const serviceId = b.serviceId || primaryService;
     const rate = rateLookup.byServiceZoneWeight(serviceId, safeZone, Number(b.rateWeight));
-    const shopifyPrice = rate ? domesticCustomerPrice(rate.priceNok, roadToll, vatMultiplier) : null;
-    const revenueExVat = shopifyPrice != null ? shopifyPrice / vatMultiplier : null;
+    const shopifyPrice = rate ? domesticCustomerPrice(rate.priceNok, roadToll, vatMultiplier, vatInclusive) : null;
+    // Revenue ex VAT: if price already includes VAT, divide it out; if ex VAT, use as-is
+    const revenueExVat = shopifyPrice != null ? (vatInclusive ? shopifyPrice / vatMultiplier : shopifyPrice) : null;
 
     return {
       name: b.name,
@@ -130,11 +131,11 @@ function computeBracketAggregates(brackets) {
  * @returns {ProfitabilityModel}
  */
 export function computeProfitability(shipments, rateLookup, analysisConfig, roadToll) {
-  const { primaryDomesticService, safeDefaultZone, vatMultiplier, domesticShopifyBrackets } = analysisConfig;
+  const { primaryDomesticService, safeDefaultZone, vatMultiplier, vatInclusive, domesticShopifyBrackets } = analysisConfig;
 
   const pricedBrackets = buildPricedBrackets(
     domesticShopifyBrackets, primaryDomesticService,
-    rateLookup, safeDefaultZone, roadToll, vatMultiplier,
+    rateLookup, safeDefaultZone, roadToll, vatMultiplier, vatInclusive !== false,
   );
 
   const { brackets: populatedBrackets, skipped } = assignShipmentsToBrackets(shipments, pricedBrackets);

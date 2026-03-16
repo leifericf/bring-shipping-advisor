@@ -11,14 +11,16 @@ export function nicePrice(value) {
 }
 
 /**
- * Compute the customer-facing domestic price (incl. road toll + VAT, rounded to nice price).
+ * Compute the customer-facing domestic price (incl. road toll, optionally + VAT, rounded to nice price).
  * @param {number} rateNok - Base rate ex VAT
  * @param {number} roadToll - Average road toll
  * @param {number} vatMultiplier - e.g. 1.25
+ * @param {boolean} [vatInclusive=true] - Whether to include VAT in the final price
  * @returns {number}
  */
-export function domesticCustomerPrice(rateNok, roadToll, vatMultiplier) {
-  return nicePrice(Math.ceil((rateNok + roadToll) * vatMultiplier));
+export function domesticCustomerPrice(rateNok, roadToll, vatMultiplier, vatInclusive = true) {
+  const base = rateNok + roadToll;
+  return nicePrice(Math.ceil(vatInclusive ? base * vatMultiplier : base));
 }
 
 /**

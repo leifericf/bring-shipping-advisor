@@ -105,7 +105,11 @@ function renderVolumeTable(model, volume, intlZones) {
 }
 
 function renderHeroNote(model) {
-  const { serviceDescriptions, avgRoadToll, vatPct, safeZone, cheapestIntl, serviceNames } = model;
+  const { serviceDescriptions, avgRoadToll, vatPct, vatInclusive, safeZone, cheapestIntl, serviceNames } = model;
+
+  const vatNote = vatInclusive
+    ? `, incl. road toll (~${avgRoadToll} kr) + ${vatPct}% VAT`
+    : `, incl. road toll (~${avgRoadToll} kr), ex VAT`;
 
   let note = `<p class="report-note">`;
   if (serviceDescriptions.length > 1) {
@@ -115,7 +119,7 @@ function renderHeroNote(model) {
     const s = serviceDescriptions[0];
     note += `Norway: ${esc(s.name)} (${esc(s.id)}). `;
   }
-  note += `Zone ${esc(safeZone)} pricing, incl. road toll (~${avgRoadToll} kr) + ${vatPct}% VAT.<br>`;
+  note += `Zone ${esc(safeZone)} pricing${vatNote}.<br>`;
   note += `International: ${esc(serviceNames[cheapestIntl] || cheapestIntl)} (${esc(cheapestIntl)}), no VAT. Countries grouped by rate similarity.<br>`;
   note += `Prices rounded up to the nearest 9.`;
   note += `</p>`;
@@ -164,7 +168,7 @@ function renderKpis(model) {
 // ── Norway zone details ──────────────────────────────────────────────────────
 
 function renderNorwayZoneDetails(model) {
-  const { rateLookup, avgRoadToll, vatMultiplier, vatPct, usedServices, shopifyBrackets, primaryService, safeZone, zoneCount, zoneLabels, serviceNames, analysis } = model;
+  const { rateLookup, avgRoadToll, vatMultiplier, vatInclusive, vatPct, usedServices, shopifyBrackets, primaryService, safeZone, zoneCount, zoneLabels, serviceNames, analysis } = model;
   const zonesForTable = analysis.zonesForShopifyTable;
 
   const parts = [];
@@ -173,14 +177,15 @@ function renderNorwayZoneDetails(model) {
   parts.push(`<div class="report-details-body">`);
 
   // Customer rates by zone
-  parts.push(`<h4>Customer rates by zone (incl. road toll + ${vatPct}% VAT)</h4>`);
+  const vatLabel = vatInclusive ? `incl. road toll + ${vatPct}% VAT` : `incl. road toll, ex VAT`;
+  parts.push(`<h4>Customer rates by zone (${vatLabel})</h4>`);
   const zoneHeaders = zonesForTable.map(z => `<th>Zone ${z} (${zoneLabels[z] || z})</th>`).join('');
 
   const bracketRows = shopifyBrackets.map(bracket => {
     const svcId = bracket.serviceId || primaryService;
     const cells = zonesForTable.map(zone => {
       const rate = rateLookup.byServiceZoneWeight(svcId, zone, Number(bracket.rateWeight));
-      const price = rate ? domesticCustomerPrice(rate.priceNok, avgRoadToll, vatMultiplier) : null;
+      const price = rate ? domesticCustomerPrice(rate.priceNok, avgRoadToll, vatMultiplier, vatInclusive) : null;
       return `<td>${price != null ? price + ' kr' : 'N/A'}</td>`;
     }).join('');
     return `<tr><td>${esc(bracket.name)}</td>${cells}</tr>`;
@@ -403,7 +408,7 @@ function renderInvoiceSummary(model) {
 // ── Assumptions ──────────────────────────────────────────────────────────────
 
 function renderAssumptions(model) {
-  const { cheapestIntl, vatPct, avgRoadToll, safeZone, zoneCount, zoneLabels, serviceDescriptions, serviceNames, analysis } = model;
+  const { cheapestIntl, vatPct, vatInclusive, avgRoadToll, safeZone, zoneCount, zoneLabels, serviceDescriptions, serviceNames, analysis } = model;
 
   const rows = [];
 
@@ -418,7 +423,10 @@ function renderAssumptions(model) {
   const mergePct = Math.round((analysis.intlZoneMergeThreshold ?? 0.10) * 100);
 
   rows.push(`<tr><th>International service</th><td>${esc(serviceNames[cheapestIntl] || cheapestIntl)} (${esc(cheapestIntl)})</td></tr>`);
-  rows.push(`<tr><th>VAT</th><td>${vatPct}% (Norway only, added to customer-facing rates)</td></tr>`);
+  const vatDesc = vatInclusive
+    ? `${vatPct}% included in customer-facing domestic rates`
+    : `${vatPct}% NOT included &mdash; rates are ex VAT (B2B pricing)`;
+  rows.push(`<tr><th>VAT</th><td>${vatDesc}</td></tr>`);
   rows.push(`<tr><th>Road toll</th><td>~${avgRoadToll} kr per shipment (avg from invoices, Norway only)</td></tr>`);
   const cheapLabel = zoneLabels['1'] || '1';
   const costLabel = zoneLabels[String(zoneCount)] || String(zoneCount);

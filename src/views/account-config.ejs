@@ -121,6 +121,14 @@
     <h2>Analysis Settings</h2>
 
     <label>
+      <input type="checkbox" id="vat-inclusive" role="switch">
+      Include VAT in domestic prices
+    </label>
+    <p class="help-text">
+      When enabled, domestic (Norway) customer-facing rates include 25% VAT. Disable for B2B pricing where customers handle VAT themselves.
+    </p>
+
+    <label>
       International zone merge threshold
       <div class="threshold-control">
         <input type="range" id="merge-threshold" min="0" max="50" step="1" value="10">
@@ -728,9 +736,27 @@ function removeDest(index) {
 // ---------------------------------------------------------------------------
 
 function initAnalysisSettings() {
+  const config = getConfig();
+
+  // VAT inclusive toggle
+  const vatCheckbox = document.getElementById('vat-inclusive');
+  if (config && config.analysis) {
+    vatCheckbox.checked = config.analysis.vatInclusive !== false;
+  } else {
+    vatCheckbox.checked = true;
+  }
+
+  vatCheckbox.addEventListener('change', function() {
+    const config = getConfig();
+    if (!config) return;
+    if (!config.analysis) config.analysis = {};
+    config.analysis.vatInclusive = this.checked;
+    setConfig(config);
+  });
+
+  // Merge threshold slider
   const slider = document.getElementById('merge-threshold');
   const output = document.getElementById('merge-threshold-value');
-  const config = getConfig();
   if (config && config.analysis && config.analysis.intlZoneMergeThreshold != null) {
     slider.value = Math.round(config.analysis.intlZoneMergeThreshold * 100);
   }

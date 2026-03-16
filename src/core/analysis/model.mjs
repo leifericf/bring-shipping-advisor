@@ -147,14 +147,14 @@ function buildServiceNames(config) {
     .reduce((acc, svc) => { acc[svc.id] = svc.name; return acc; }, {});
 }
 
-function buildNorwayRates(shopifyBrackets, primaryService, rateLookup, safeZone, roadToll, vatMultiplier) {
+function buildNorwayRates(shopifyBrackets, primaryService, rateLookup, safeZone, roadToll, vatMultiplier, vatInclusive) {
   return shopifyBrackets.map(b => {
     const svcId = b.serviceId || primaryService;
     const rate = rateLookup.byServiceZoneWeight(svcId, safeZone, Number(b.rateWeight));
     if (!rate) return { name: b.name, price: null, serviceId: svcId };
     return {
       name: b.name,
-      price: domesticCustomerPrice(rate.priceNok, roadToll, vatMultiplier),
+      price: domesticCustomerPrice(rate.priceNok, roadToll, vatMultiplier, vatInclusive),
       serviceId: svcId,
     };
   });
@@ -213,6 +213,7 @@ export function buildAnalysisModel({ rates, lineItems, config, generatedAt }) {
   const primaryService = analysis.primaryDomesticService;
   const cheapestIntl = analysis.cheapestInternationalService;
   const vatMultiplier = analysis.vatMultiplier;
+  const vatInclusive = analysis.vatInclusive !== false; // default true
   const safeZone = analysis.safeDefaultZone;
   const shopifyBrackets = analysis.domesticShopifyBrackets;
   const intlShopifyBrackets = analysis.internationalShopifyBrackets;
@@ -225,7 +226,7 @@ export function buildAnalysisModel({ rates, lineItems, config, generatedAt }) {
   const invoiceAnalysis = analyzeInvoices(lineItems);
   const avgRoadToll = Math.round(invoiceAnalysis.avgRoadToll * 100) / 100;
 
-  const norwayRates = buildNorwayRates(shopifyBrackets, primaryService, rateLookup, safeZone, avgRoadToll, vatMultiplier);
+  const norwayRates = buildNorwayRates(shopifyBrackets, primaryService, rateLookup, safeZone, avgRoadToll, vatMultiplier, vatInclusive);
 
   const intlCodes = Object.keys(config.countryNames);
   const intlZones = clusterInternationalZones(
@@ -263,6 +264,7 @@ export function buildAnalysisModel({ rates, lineItems, config, generatedAt }) {
     primaryService,
     cheapestIntl,
     vatMultiplier,
+    vatInclusive,
     vatPct: Math.round((vatMultiplier - 1) * 100),
     safeZone,
     zoneCount: analysis.domesticZoneCount,
