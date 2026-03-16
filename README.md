@@ -85,12 +85,12 @@ New accounts start with the defaults from `config.json`.
 
 The app includes a built-in database of countries flagged for shipping risk (`src/core/flagged-countries.mjs`). Each flagged country has a risk level and a documented reason:
 
-| Risk | Meaning | Examples |
-|------|---------|---------|
-| **Critical** | Sanctions, active war, or failed state. Do not ship. | North Korea, Iran, Syria, Russia, Ukraine, Somalia |
-| **High** | Conflict, extreme corruption, collapsed systems. Strongly advised against. | Myanmar, Venezuela, Haiti, DR Congo, Iraq, Nigeria |
-| **Medium** | Significant instability, weak postal infrastructure, or high corruption. | Turkey, India, South Africa, Egypt, most of sub-Saharan Africa |
-| **Low** | Minor concerns: microstates, dependencies, or borderline systems. | Monaco, Greenland, Brazil, China, Australia |
+| Risk | Meaning |
+|------|---------|
+| **Critical** | Sanctions, active war, or failed state. Do not ship. |
+| **High** | Conflict, extreme corruption, collapsed systems. Strongly advised against. |
+| **Medium** | Significant instability, weak postal infrastructure, or high corruption. |
+| **Low** | Minor concerns: microstates, dependencies, or borderline systems. |
 
 When editing an account's destinations:
 
