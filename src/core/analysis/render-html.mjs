@@ -219,7 +219,7 @@ function renderNorwayZoneDetails(model) {
 
   const cheapestLabel = zoneLabels['1'] || '1';
   const costliestLabel = zoneLabels[String(zoneCount)] || String(zoneCount);
-  parts.push(`<p class="report-note">Zone 1 (${esc(cheapestLabel)}) is cheapest. Zone ${zoneCount} (${esc(costliestLabel)}) costs roughly 2&times; Zone 1. The recommended rates above use Zone ${safeZone} as a safe middle ground.</p>`);
+  parts.push(`<p class="report-note">Zone 1 (${esc(cheapestLabel)}) is cheapest. Zone ${zoneCount} (${esc(costliestLabel)}) costs roughly 2&times; Zone 1. The recommended rates above use Zone ${safeZone} as a safe middle ground. Note: the total zone count for a shipment is local-sender + terminal-to-terminal + local-receiver. Origins near major terminals may not reach zone ${zoneCount}, so some rows may show N/A.</p>`);
   parts.push(`</div></details>`);
 
   return parts.join('');
@@ -430,7 +430,7 @@ function renderAssumptions(model) {
   rows.push(`<tr><th>Road toll</th><td>~${avgRoadToll} kr per shipment (avg from invoices, Norway only)</td></tr>`);
   const cheapLabel = zoneLabels['1'] || '1';
   const costLabel = zoneLabels[String(zoneCount)] || String(zoneCount);
-  rows.push(`<tr><th>Norway pricing zone</th><td>Zone ${esc(safeZone)} &mdash; covers most of the country. Zone 1 (${esc(cheapLabel)}) is cheapest, Zone ${zoneCount} (${esc(costLabel)}) ~2&times; Zone 1</td></tr>`);
+  rows.push(`<tr><th>Norway pricing zone</th><td>Zone ${esc(safeZone)} &mdash; covers most of the country. Zone 1 (${esc(cheapLabel)}) is cheapest, Zone ${zoneCount} (${esc(costLabel)}) ~2&times; Zone 1. Bring supports up to 8 zones for parcels; the actual max depends on your origin postal code.</td></tr>`);
   rows.push(`<tr><th>Price rounding</th><td>Rounded up to next "nice" price ending in 9</td></tr>`);
   rows.push(`<tr><th>International grouping</th><td>Countries with rates within ${mergePct}% of each other are merged into one zone. The zone charges the highest rate so you never lose money. Adjust <code>intlZoneMergeThreshold</code> in the account config to change.</td></tr>`);
   rows.push(`<tr><th>Zone caveat</th><td>Zone numbers can differ per service for the same postal code</td></tr>`);

@@ -114,7 +114,7 @@ The database is not backed up automatically. If you want to keep a copy, just co
 
 ## Notes
 
-- **Norway zone system**: Bring uses 7 shipping zones based on distance from origin. Zone numbers can differ per service for the same postal code.
+- **Norway zone system**: Bring uses up to 8 shipping zones for domestic parcels. The total zone count for a shipment is: local sender zone + main terminal-to-terminal zone + local receiver zone. Origins near major terminals (e.g. Oslo) have local sender zone 0, so the practical max for those origins is 7. Zone numbers can differ per service for the same postal code.
 - **Per-bracket services**: Domestic brackets can use different Bring services (e.g. 3584 "Postkassen" up to 5 kg, 5800 "Hentested" for 5–20 kg). The report clearly labels which service each tier uses.
 - **International zone clustering**: Countries are automatically grouped into shipping zones based on rate similarity. Countries whose customer-facing prices (after nicePrice rounding) are within the configured merge threshold are merged, using the highest rate in the group.
 - **VAT**: Norway requires 25% VAT on shipping charged to customers. International shipping has no VAT.

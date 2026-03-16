@@ -41,7 +41,7 @@
     "safeDefaultZone": "3",
     "primaryDomesticService": "3584",
     "cheapestInternationalService": "PICKUP_PARCEL",
-    "domesticZoneCount": 7,
+    "domesticZoneCount": 8,
     "intlZoneMergeThreshold": 0.10,
     "domesticShopifyBrackets": [
       { "name": "0\u20130.5 kg", "maxWeight": 0.5, "rateWeight": "250", "serviceId": "3584" },
