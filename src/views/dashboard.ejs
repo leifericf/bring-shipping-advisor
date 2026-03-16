@@ -68,7 +68,7 @@
               </td>
               <td><code><%= run.customer_number %></code></td>
               <td><%= fmtDate(run.created_at) %></td>
-              <td><span class="status status-<%= run.status %>"><%= run.status.replace(/_/g, ' ') %></span></td>
+              <td><span class="status status-<%= run.status %>"><%= fmtStatus(run.status) %></span></td>
               <td><a href="/runs/<%= run.id %>">View</a></td>
             </tr>
           <% } %>

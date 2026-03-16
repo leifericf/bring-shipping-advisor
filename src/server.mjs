@@ -4,7 +4,9 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { spawn } from 'child_process';
 import { tmpdir } from 'os';
-import { httpsGet } from './lib.mjs';
+import { httpsGet, DEFAULT_ORIGIN_POSTAL_CODE } from './lib.mjs';
+import { fmtDate, fmtStatus } from './core/formatting.mjs';
+import { validateConfig } from './core/config/validate.mjs';
 import { DEFAULT_CONFIG_PATH } from './config.mjs';
 import {
   getDb, closeDb,
@@ -27,18 +29,10 @@ app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 app.use(express.static(join(__dirname, 'public')));
 
 /**
- * Format a SQLite datetime string for display.
- */
-function fmtDate(sqliteDateStr, opts = {}) {
-  const defaults = { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' };
-  return new Date(sqliteDateStr + 'Z').toLocaleDateString('en-GB', { ...defaults, ...opts });
-}
-
-/**
  * Render a view inside the layout.
  */
 function render(res, view, locals = {}) {
-  const allLocals = { ...locals, fmtDate, currentPath: res.req.path };
+  const allLocals = { ...locals, fmtDate, fmtStatus, currentPath: res.req.path };
   res.render(view, allLocals, (err, body) => {
     if (err) { console.error(err); return res.status(500).send('Render error'); }
     res.render('layout', { ...allLocals, body });
@@ -46,20 +40,24 @@ function render(res, view, locals = {}) {
 }
 
 /**
- * Enrich a run object with its account name (if it has an account).
+ * Return a copy of a run object enriched with its account name.
  */
 function enrichRunWithAccountName(run) {
-  if (run.account_id) {
-    const account = getAccount(run.account_id);
-    run.account_name = account ? account.name : null;
-  }
+  if (!run.account_id) return run;
+  const account = getAccount(run.account_id);
+  return { ...run, account_name: account ? account.name : null };
 }
 
 /**
  * Load the default config.json as a parsed object (for new accounts).
+ * Throws a descriptive error if the file is missing or invalid.
  */
 function getDefaultConfig() {
-  return JSON.parse(fs.readFileSync(DEFAULT_CONFIG_PATH, 'utf8'));
+  try {
+    return JSON.parse(fs.readFileSync(DEFAULT_CONFIG_PATH, 'utf8'));
+  } catch (err) {
+    throw new Error(`Failed to load default config from ${DEFAULT_CONFIG_PATH}: ${err.message}`);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -83,7 +81,7 @@ app.get('/accounts/new', (req, res) => {
 app.post('/accounts', (req, res) => {
   const { name, api_uid, api_key, customer_number, origin_postal_code } = req.body;
   const config = getDefaultConfig();
-  const id = createAccount(name, api_uid, api_key, customer_number, origin_postal_code || '0174', config);
+  const id = createAccount(name, api_uid, api_key, customer_number, origin_postal_code || DEFAULT_ORIGIN_POSTAL_CODE, config);
   res.redirect(`/accounts/${id}/runs`);
 });
 
@@ -96,7 +94,7 @@ app.get('/accounts/:id/edit', (req, res) => {
 app.post('/accounts/:id', (req, res) => {
   const id = Number(req.params.id);
   const { name, api_uid, api_key, customer_number, origin_postal_code } = req.body;
-  updateAccount(id, name, api_uid, api_key, customer_number, origin_postal_code || '0174');
+  updateAccount(id, name, api_uid, api_key, customer_number, origin_postal_code || DEFAULT_ORIGIN_POSTAL_CODE);
   res.redirect(`/accounts/${id}/runs`);
 });
 
@@ -131,6 +129,15 @@ app.post('/accounts/:id/config', (req, res) => {
     return render(res, 'account-config', {
       title: 'Config: ' + account.name, account, configJson,
       flash: 'Invalid JSON: ' + err.message,
+    });
+  }
+
+  const validation = validateConfig(config);
+  if (!validation.ok) {
+    const configJson = JSON.stringify(config, null, 2);
+    return render(res, 'account-config', {
+      title: 'Config: ' + account.name, account, configJson,
+      flash: 'Invalid config: ' + validation.errors.join('; '),
     });
   }
 
@@ -183,7 +190,7 @@ app.post('/accounts/:id/runs', (req, res) => {
 
   // Clean up temp config when done
   child.on('close', () => {
-    try { fs.unlinkSync(configPath); } catch {}
+    try { fs.unlinkSync(configPath); } catch (e) { console.warn(`Cleanup: ${e.message}`); }
   });
 
   res.redirect(`/runs/${runId}`);
@@ -194,9 +201,9 @@ app.post('/accounts/:id/runs', (req, res) => {
 // ---------------------------------------------------------------------------
 
 app.get('/runs/:id', (req, res) => {
-  const run = getRun(Number(req.params.id));
+  let run = getRun(Number(req.params.id));
   if (!run) return res.status(404).send('Run not found');
-  enrichRunWithAccountName(run);
+  run = enrichRunWithAccountName(run);
 
   let resultsHtml = null;
   if (run.status === 'completed') {
@@ -229,10 +236,10 @@ app.get('/api/runs/:id/status', (req, res) => {
 // ---------------------------------------------------------------------------
 
 app.get('/runs/:id/invoices', (req, res) => {
-  const run = getRun(Number(req.params.id));
+  let run = getRun(Number(req.params.id));
   if (!run) return res.status(404).send('Run not found');
 
-  enrichRunWithAccountName(run);
+  run = enrichRunWithAccountName(run);
 
   const invoices = getInvoices(run.id);
   render(res, 'invoices', { title: 'Invoices — Run #' + run.id, run, invoices });

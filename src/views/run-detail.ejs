@@ -25,7 +25,7 @@
   </div>
   <div class="run-meta-item">
     <span class="run-meta-label">Status</span>
-    <span class="run-meta-value"><span class="status status-<%= run.status %>" id="run-status"><%= run.status.replace(/_/g, ' ') %></span></span>
+    <span class="run-meta-value"><span class="status status-<%= run.status %>" id="run-status"><%= fmtStatus(run.status) %></span></span>
   </div>
 </div>
 
