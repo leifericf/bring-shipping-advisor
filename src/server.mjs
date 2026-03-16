@@ -114,11 +114,9 @@ app.get('/accounts/:id/config', (req, res) => {
 
   const config = JSON.parse(account.config);
   const configJson = JSON.stringify(config, null, 2);
-  const destCodes = (config.destinations || []).map(d => d.code);
-  const flaggedInConfig = checkForFlaggedCountries(destCodes);
   render(res, 'account-config', {
     title: 'Config: ' + account.name, account, configJson,
-    flaggedInConfig, flaggedCountries: FLAGGED_COUNTRIES, riskLabels: RISK_LABELS,
+    flaggedCountries: FLAGGED_COUNTRIES, riskLabels: RISK_LABELS,
   });
 });
 
@@ -136,8 +134,7 @@ app.post('/accounts/:id/config', (req, res) => {
     const configJson = req.body.config;
     return render(res, 'account-config', {
       title: 'Config: ' + account.name, account, configJson,
-      flash: 'Invalid JSON: ' + err.message,
-      flaggedInConfig: [], ...flaggedLocals,
+      flash: 'Invalid JSON: ' + err.message, ...flaggedLocals,
     });
   }
 
@@ -146,26 +143,21 @@ app.post('/accounts/:id/config', (req, res) => {
     const configJson = JSON.stringify(config, null, 2);
     return render(res, 'account-config', {
       title: 'Config: ' + account.name, account, configJson,
-      flash: 'Invalid config: ' + validation.errors.join('; '),
-      flaggedInConfig: checkForFlaggedCountries((config.destinations || []).map(d => d.code)),
-      ...flaggedLocals,
+      flash: 'Invalid config: ' + validation.errors.join('; '), ...flaggedLocals,
     });
   }
 
-  // Check for flagged countries — warn but still save
-  const destCodes = (config.destinations || []).map(d => d.code);
-  const flaggedInConfig = checkForFlaggedCountries(destCodes);
-
   updateAccountConfig(id, config);
 
+  // Check for flagged countries — warn but still save
+  const flaggedInConfig = checkForFlaggedCountries((config.destinations || []).map(d => d.code));
   if (flaggedInConfig.length > 0) {
     const warnings = flaggedInConfig.map(f => `${f.country} (${f.code}): ${f.risk} risk`);
     const configJson = JSON.stringify(config, null, 2);
     return render(res, 'account-config', {
       title: 'Config: ' + account.name, account, configJson,
-      flaggedInConfig, ...flaggedLocals,
       flash: 'Saved, but config contains flagged countries: ' + warnings.join('; '),
-      flashType: 'warning',
+      flashType: 'warning', ...flaggedLocals,
     });
   }
 

@@ -9,25 +9,9 @@
   <p><%= account.name %> &mdash; shipping countries, services, weight tiers, and analysis settings.</p>
 </hgroup>
 
-<% if (typeof flaggedInConfig !== 'undefined' && flaggedInConfig.length > 0) { %>
-<details class="flagged-warning" open>
-  <summary>
-    Warning: <%= flaggedInConfig.length %> flagged countr<%= flaggedInConfig.length === 1 ? 'y' : 'ies' %> in shipping countries
-  </summary>
-  <table class="flagged-table">
-    <thead><tr><th>Country</th><th>Risk</th><th>Reason</th></tr></thead>
-    <tbody>
-    <% flaggedInConfig.forEach(f => { %>
-      <tr class="flagged-<%= f.risk %>">
-        <td><strong><%= f.country %></strong> (<code><%= f.code %></code>)</td>
-        <td><span class="risk-badge risk-<%= f.risk %>"><%= riskLabels[f.risk] %></span></td>
-        <td><%= f.reason %></td>
-      </tr>
-    <% }) %>
-    </tbody>
-  </table>
-</details>
-<% } %>
+<div id="flagged-warning-container">
+  <!-- Rebuilt dynamically by renderFlaggedWarning() -->
+</div>
 
 <form method="POST" action="/accounts/<%= account.id %>/config" id="config-form">
 
@@ -48,18 +32,24 @@
 
       <!-- Single country -->
       <div id="add-single-panel" class="add-panel active" role="tabpanel">
-        <div class="add-country-row">
+        <div class="add-country-search">
           <div class="autocomplete-wrap" role="combobox" aria-expanded="false" aria-haspopup="listbox" aria-owns="country-suggestions">
-            <input type="text" id="new-country" placeholder="Country name..." autocomplete="off" aria-autocomplete="list" aria-controls="country-suggestions" aria-label="Country name">
+            <input type="text" id="new-country" placeholder="Type a country name to add it..." autocomplete="off" aria-autocomplete="list" aria-controls="country-suggestions" aria-label="Country name">
             <ul class="autocomplete-list" id="country-suggestions" role="listbox" aria-label="Country suggestions"></ul>
           </div>
-          <input type="text" id="new-code" placeholder="Code" maxlength="2" aria-label="Country code" class="add-country-code">
-          <input type="text" id="new-postal" placeholder="Postal code" aria-label="Postal code" class="add-country-postal">
-          <input type="number" id="new-zone" placeholder="Zone" min="1" aria-label="Zone" class="add-country-zone">
-          <input type="text" id="new-desc" placeholder="Description" aria-label="Description" class="add-country-desc">
-          <button type="button" id="add-dest-btn">Add</button>
         </div>
         <div class="dest-add-error" id="dest-add-error"></div>
+        <details class="add-country-advanced">
+          <summary>Advanced: manual entry</summary>
+          <p class="region-help">Add a country manually if it is not in the autocomplete list.</p>
+          <div class="add-country-row">
+            <input type="text" id="new-code" placeholder="Code (SE)" maxlength="2" aria-label="Country code" class="add-country-code">
+            <input type="text" id="new-postal" placeholder="Postal code" aria-label="Postal code" class="add-country-postal">
+            <input type="number" id="new-zone" placeholder="Zone" min="1" aria-label="Zone" class="add-country-zone">
+            <input type="text" id="new-desc" placeholder="Description" aria-label="Description" class="add-country-desc">
+            <button type="button" id="add-dest-btn">Add</button>
+          </div>
+        </details>
       </div>
 
       <!-- By region -->
@@ -206,6 +196,47 @@ async function loadCountries() {
 loadCountries().then(() => renderDestinations());
 
 // ---------------------------------------------------------------------------
+// Flagged country warning banner (dynamic)
+// ---------------------------------------------------------------------------
+
+function renderFlaggedWarning() {
+  const container = document.getElementById('flagged-warning-container');
+  const config = getConfig();
+  if (!config || !Array.isArray(config.destinations)) {
+    container.innerHTML = '';
+    return;
+  }
+
+  const flagged = config.destinations
+    .map(d => getFlagged(d.code))
+    .filter(Boolean)
+    .sort((a, b) => RISK_LEVELS.indexOf(a.risk) - RISK_LEVELS.indexOf(b.risk));
+
+  if (flagged.length === 0) {
+    container.innerHTML = '';
+    return;
+  }
+
+  const label = flagged.length === 1 ? '1 flagged country' : flagged.length + ' flagged countries';
+  const rows = flagged.map(f =>
+    '<tr class="flagged-' + f.risk + '">' +
+    '<td><strong>' + esc(f.country) + '</strong> (<code>' + esc(f.code) + '</code>)</td>' +
+    '<td><span class="risk-badge ' + RISK_CLASSES[f.risk] + '">' + esc(RISK_LABELS[f.risk]) + '</span></td>' +
+    '<td>' + esc(f.reason) + '</td>' +
+    '</tr>'
+  ).join('');
+
+  container.innerHTML =
+    '<details class="flagged-warning" open>' +
+    '<summary>Warning: ' + label + ' in shipping countries</summary>' +
+    '<table class="flagged-table"><thead><tr><th>Country</th><th>Risk</th><th>Reason</th></tr></thead>' +
+    '<tbody>' + rows + '</tbody></table>' +
+    '</details>';
+}
+
+const RISK_LEVELS = ['critical', 'high', 'medium', 'low'];
+
+// ---------------------------------------------------------------------------
 // State helpers
 // ---------------------------------------------------------------------------
 
@@ -230,6 +261,7 @@ function getSubregion(code) {
 }
 
 function renderDestinations() {
+  renderFlaggedWarning();
   const config = getConfig();
   if (!config || !Array.isArray(config.destinations)) return;
 
@@ -370,7 +402,11 @@ function esc(s) {
       const li = document.createElement('li');
       li.id = 'country-opt-' + i;
       li.setAttribute('role', 'option');
-      li.textContent = c.name + ' (' + c.code + ')';
+      const flag = getFlagged(c.code);
+      const badge = flag
+        ? ' <span class="risk-badge ' + RISK_CLASSES[flag.risk] + '">' + esc(RISK_LABELS[flag.risk]) + '</span>'
+        : '';
+      li.innerHTML = esc(c.name) + ' <code>' + esc(c.code) + '</code>' + badge;
       li.dataset.index = i;
       li.addEventListener('mousedown', function (e) {
         e.preventDefault(); // prevent blur before click fires
@@ -419,15 +455,53 @@ function esc(s) {
   });
 
   function selectCountry(c) {
-    input.value = c.name;
-    document.getElementById('new-code').value = c.code;
-    if (c.capital) {
-      document.getElementById('new-desc').value = c.capital;
-    }
     setExpanded(false);
     activeIdx = -1;
-    // Focus postal code since that's what the user still needs to fill in
-    document.getElementById('new-postal').focus();
+    input.value = '';
+
+    // Auto-add using sensible defaults from the API
+    const code = c.code;
+    const country = c.name;
+    const postal = c.capital || '00000';
+    const desc = c.capital || null;
+
+    const errorEl = document.getElementById('dest-add-error');
+    errorEl.style.display = 'none';
+
+    // Warn if flagged
+    const flag = getFlagged(code);
+    if (flag) {
+      const riskLabel = RISK_LABELS[flag.risk] || flag.risk;
+      if (!confirm('Warning: ' + country + ' (' + code + ') is flagged as ' + riskLabel + ' risk.\n\n' + flag.reason + '\n\nAre you sure you want to add it?')) {
+        return;
+      }
+    }
+
+    const config = getConfig();
+    if (!config) {
+      errorEl.textContent = 'Cannot add \u2014 underlying JSON is invalid.';
+      errorEl.style.display = 'block';
+      return;
+    }
+    if (!Array.isArray(config.destinations)) config.destinations = [];
+
+    // Check for duplicate
+    if (config.destinations.find(d => d.code === code)) {
+      errorEl.textContent = country + ' (' + code + ') is already in the list.';
+      errorEl.style.display = 'block';
+      return;
+    }
+
+    const entry = { country, code, postalCode: postal };
+    if (desc) entry.desc = desc;
+
+    config.destinations.push(entry);
+    setConfig(config);
+    renderDestinations();
+
+    // Brief success feedback
+    input.placeholder = 'Added ' + country;
+    setTimeout(() => { input.placeholder = 'Type a country name to add it...'; }, 1500);
   }
 })();
 
@@ -491,8 +565,9 @@ document.getElementById('region-select').addEventListener('change', function () 
     const label = document.createElement('label');
     label.className = 'region-country-item' + (already ? ' already-added' : '') + (isFlagged ? ' flagged-item' : '');
 
-    // Flagged countries are unchecked by default; non-flagged are checked
-    const checked = already ? '' : (isFlagged ? '' : 'checked');
+    // Uncheck medium/high/critical risk; low risk and unflagged stay checked
+    const isElevatedRisk = isFlagged && flag.risk !== 'low';
+    const checked = already ? '' : (isElevatedRisk ? '' : 'checked');
     const disabled = already ? 'disabled' : '';
 
     let flagHtml = '';
@@ -576,27 +651,27 @@ document.getElementById('add-region-btn').addEventListener('click', function () 
 // Add / Remove single destination
 // ---------------------------------------------------------------------------
 
+// Manual add — for the advanced entry form
 function addDest() {
   const errorEl = document.getElementById('dest-add-error');
   errorEl.style.display = 'none';
 
-  const country = document.getElementById('new-country').value.trim();
   const code    = document.getElementById('new-code').value.trim().toUpperCase();
   const postal  = document.getElementById('new-postal').value.trim();
   const zoneRaw = document.getElementById('new-zone').value.trim();
   const desc    = document.getElementById('new-desc').value.trim();
 
-  if (!country || !code || !postal) {
-    errorEl.textContent = 'Country, Code, and Postal Code are required.';
-    errorEl.style.display = 'block';
-    return;
-  }
-
-  if (code.length !== 2) {
+  if (!code || code.length !== 2) {
     errorEl.textContent = 'Country code must be exactly 2 letters (ISO 3166-1 alpha-2).';
     errorEl.style.display = 'block';
     return;
   }
+
+  // Look up country name and defaults from API data
+  const apiCountry = allCountries.find(c => c.code === code);
+  const country = apiCountry ? apiCountry.name : code;
+  const finalPostal = postal || (apiCountry ? apiCountry.capital : '') || '00000';
+  const finalDesc = desc || (apiCountry ? apiCountry.capital : '') || null;
 
   // Warn if flagged
   const flag = getFlagged(code);
@@ -615,24 +690,21 @@ function addDest() {
   }
   if (!Array.isArray(config.destinations)) config.destinations = [];
 
-  // Check for duplicate (same code + postalCode)
-  const dup = config.destinations.find(d => d.code === code && d.postalCode === postal);
-  if (dup) {
-    errorEl.textContent = 'Duplicate: a country with code ' + code + ' and postal code ' + postal + ' already exists.';
+  if (config.destinations.find(d => d.code === code)) {
+    errorEl.textContent = country + ' (' + code + ') is already in the list.';
     errorEl.style.display = 'block';
     return;
   }
 
-  const entry = { country, code, postalCode: postal };
+  const entry = { country, code, postalCode: finalPostal };
   entry.zone = zoneRaw !== '' ? Number(zoneRaw) : null;
-  if (desc) entry.desc = desc;
+  if (finalDesc) entry.desc = finalDesc;
 
   config.destinations.push(entry);
   setConfig(config);
   renderDestinations();
 
   // Clear inputs
-  document.getElementById('new-country').value = '';
   document.getElementById('new-code').value = '';
   document.getElementById('new-postal').value = '';
   document.getElementById('new-zone').value = '';

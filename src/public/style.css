@@ -486,22 +486,24 @@ details summary:hover {
 .add-panel { display: none; padding: 1rem; }
 .add-panel.active { display: block; }
 
-/* Single country — inline row */
+/* Single country — search input */
+.add-country-search { }
+.add-country-search input { margin-bottom: 0; }
+
+/* Advanced manual entry row */
+.add-country-advanced { margin-top: 0.5rem; font-size: 0.9rem; }
+.add-country-advanced summary { color: var(--pico-muted-color); cursor: pointer; }
+
 .add-country-row {
   display: flex;
   gap: 0.5rem;
   align-items: center;
   flex-wrap: wrap;
+  margin-top: 0.5rem;
 }
 
-.add-country-row input,
-.add-country-row .autocomplete-wrap {
-  margin-bottom: 0;
-}
-
-.add-country-row .autocomplete-wrap { flex: 2; min-width: 160px; }
-.add-country-row .autocomplete-wrap input { margin-bottom: 0; }
-.add-country-code { width: 5rem; flex: 0 0 5rem; }
+.add-country-row input { margin-bottom: 0; }
+.add-country-code  { width: 5rem; flex: 0 0 5rem; }
 .add-country-postal { width: 8rem; flex: 0 0 8rem; }
 .add-country-zone  { width: 5rem; flex: 0 0 5rem; }
 .add-country-desc  { flex: 1; min-width: 8rem; }
