@@ -184,8 +184,8 @@
 // Flagged countries (injected from server)
 // ---------------------------------------------------------------------------
 
-const FLAGGED = new Map(<%= JSON.stringify((typeof flaggedCountries !== 'undefined' ? flaggedCountries : []).map(f => [f.code, f])) %>);
-const RISK_LABELS = <%= JSON.stringify(typeof riskLabels !== 'undefined' ? riskLabels : {}) %>;
+const FLAGGED = new Map(<%- JSON.stringify((typeof flaggedCountries !== 'undefined' ? flaggedCountries : []).map(f => [f.code, f])) %>);
+const RISK_LABELS = <%- JSON.stringify(typeof riskLabels !== 'undefined' ? riskLabels : {}) %>;
 const RISK_CLASSES = { critical: 'risk-critical', high: 'risk-high', medium: 'risk-medium', low: 'risk-low' };
 
 function getFlagged(code) { return FLAGGED.get(code) || null; }
