@@ -1,6 +1,6 @@
 {
   "name": "bring-shipping-advisor",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Fetch and analyze shipping rates from Bring (Posten) for Shopify stores",
   "type": "module",
   "main": "electron/main.mjs",
