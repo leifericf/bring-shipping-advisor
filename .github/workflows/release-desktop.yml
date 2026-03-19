@@ -44,7 +44,7 @@ jobs:
         run: npm run desktop:rebuild
 
       - name: Build installer
-        run: npm run desktop:dist -- --${{ matrix.platform }}
+        run: npm run desktop:dist -- --${{ matrix.platform }} --publish never
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
