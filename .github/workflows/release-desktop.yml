@@ -1,0 +1,117 @@
+name: Release Desktop App
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+      - 'v*.*.*-*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to build (e.g. v1.0.0)'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: macos-latest
+            platform: mac
+            artifact: dmg
+          - os: windows-latest
+            platform: win
+            artifact: exe
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Rebuild native modules for Electron
+        run: npm run desktop:rebuild
+
+      - name: Build installer
+        run: npm run desktop:dist -- --${{ matrix.platform }}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: installer-${{ matrix.platform }}
+          path: |
+            dist/*.dmg
+            dist/*.exe
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download macOS installer
+        uses: actions/download-artifact@v4
+        with:
+          name: installer-mac
+          path: release-assets
+
+      - name: Download Windows installer
+        uses: actions/download-artifact@v4
+        with:
+          name: installer-win
+          path: release-assets
+
+      - name: Determine tag
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "version=${{ github.event.inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Detect pre-release
+        id: prerelease
+        run: |
+          TAG="${{ steps.tag.outputs.version }}"
+          if echo "$TAG" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "is_prerelease=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "is_prerelease=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.version }}
+          name: ${{ steps.tag.outputs.version }}
+          prerelease: ${{ steps.prerelease.outputs.is_prerelease }}
+          generate_release_notes: true
+          files: release-assets/*
+          body: |
+            ## Installation
+
+            Download the installer for your platform:
+
+            | Platform | File |
+            |----------|------|
+            | macOS | `.dmg` |
+            | Windows | `.exe` |
+
+            ### First-run trust warnings
+
+            These installers are not code-signed. Your OS will show a warning on first launch:
+
+            - **macOS**: right-click the app → Open → click "Open" in the dialog. You only need to do this once.
+            - **Windows**: click "More info" → "Run anyway" in the SmartScreen dialog.

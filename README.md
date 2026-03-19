@@ -35,6 +35,10 @@ Download the installer for your platform from the [Releases](../../releases) pag
 
 Launch the app like any other application. No terminal, no dependencies to install. Close the window when you're done.
 
+> **First-run trust warning:** These installers are not code-signed. Your OS will show a warning on first launch:
+> - **macOS**: right-click the app, click Open, then click "Open" in the dialog. You only need to do this once.
+> - **Windows**: click "More info" in the SmartScreen dialog, then click "Run anyway".
+
 ### Web Server (alternative, for developers)
 
 If you prefer running the app as a standalone web server:
@@ -168,6 +172,32 @@ In web server mode, you can query the SQLite database directly:
 ```bash
 sqlite3 data/bring.db "SELECT id, created_at, status FROM runs"
 ```
+
+### Releasing
+
+This project uses [SemVer](https://semver.org/) for versioning:
+
+- **Patch** (`v1.0.1`): bug fixes, docs, internal improvements
+- **Minor** (`v1.1.0`): backwards-compatible new features
+- **Major** (`v2.0.0`): breaking changes
+
+Desktop app installers are built and published automatically by GitHub Actions when a version tag is pushed. To create a release:
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+This triggers a workflow that builds `.dmg` (macOS) and `.exe` (Windows) installers and attaches them to a GitHub Release.
+
+Pre-release tags (e.g. `v1.1.0-rc.1`, `v2.0.0-beta.1`) are automatically published as GitHub pre-releases:
+
+```bash
+git tag v1.1.0-rc.1
+git push origin v1.1.0-rc.1
+```
+
+You can also trigger a build manually from the Actions tab using workflow dispatch.
 
 ## Disclaimer
 
